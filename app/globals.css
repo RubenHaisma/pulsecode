@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 10, 10, 20;
+  --background-end-rgb: 20, 20, 40;
+  
+  /* Neon Colors */
+  --neon-pink: 255, 0, 153;
+  --neon-blue: 0, 195, 255;
+  --neon-purple: 162, 0, 255;
+  
+  /* Theme Colors */
+  --primary: 255, 0, 153;
+  --primary-foreground: 255, 255, 255;
+  --secondary: 0, 195, 255;
+  --secondary-foreground: 255, 255, 255;
+  --accent: 162, 0, 255;
+  --accent-foreground: 255, 255, 255;
+}
+
+@layer base {
+  body {
+    @apply bg-gradient-to-b from-background-start to-background-end min-h-screen text-white;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .pixel-font {
+    font-family: 'Press Start 2P', cursive;
+  }
+
+  .neon-glow {
+    text-shadow: 0 0 10px rgba(var(--neon-pink), 0.8),
+                 0 0 20px rgba(var(--neon-pink), 0.4),
+                 0 0 30px rgba(var(--neon-pink), 0.2);
+  }
+
+  .neon-button {
+    @apply relative overflow-hidden rounded-lg px-6 py-3 transition-all duration-300;
+    background: linear-gradient(45deg, 
+      rgba(var(--neon-pink), 0.2),
+      rgba(var(--neon-blue), 0.2)
+    );
+    box-shadow: 0 0 10px rgba(var(--neon-pink), 0.4),
+                0 0 20px rgba(var(--neon-blue), 0.2);
+  }
+
+  .neon-button:hover {
+    @apply transform scale-105;
+    box-shadow: 0 0 20px rgba(var(--neon-pink), 0.6),
+                0 0 40px rgba(var(--neon-blue), 0.3);
+  }
+
+  .neon-border {
+    @apply relative rounded-xl;
+    background: linear-gradient(45deg,
+      rgba(var(--neon-pink), 0.3),
+      rgba(var(--neon-blue), 0.3),
+      rgba(var(--neon-purple), 0.3)
+    );
+    box-shadow: 0 0 15px rgba(var(--neon-pink), 0.2),
+                0 0 30px rgba(var(--neon-blue), 0.1);
+  }
+
+  .star-field {
+    @apply fixed inset-0 z-0;
+    background-image: radial-gradient(2px 2px at 20px 30px, #eee, rgba(0,0,0,0)),
+                     radial-gradient(2px 2px at 40px 70px, #fff, rgba(0,0,0,0)),
+                     radial-gradient(2px 2px at 50px 160px, #ddd, rgba(0,0,0,0));
+    background-size: 200px 200px;
+    animation: stars 4s linear infinite;
+  }
+
+  @keyframes stars {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(-200px);
+    }
+  }
+
+  .glitch {
+    animation: glitch 1s linear infinite;
+    position: relative;
+  }
+
+  @keyframes glitch {
+    2%, 64% {
+      transform: translate(2px,0) skew(0deg);
+    }
+    4%, 60% {
+      transform: translate(-2px,0) skew(0deg);
+    }
+    62% {
+      transform: translate(0,0) skew(5deg);
+    }
+  }
+}
