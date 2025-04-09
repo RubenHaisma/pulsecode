@@ -95,6 +95,10 @@ export async function GET(req: Request) {
             totalLinesChanged: githubData.totalLinesChanged,
             stars: githubData.stars,
             repos: githubData.repos,
+            currentStreak: githubData.currentStreak,
+            longestStreak: githubData.longestStreak,
+            activeDays: githubData.activeDays,
+            totalRepositoriesImpacted: githubData.totalRepositoriesImpacted
           },
           achievements: updatedUser.achievements || [],
           timeRange,
@@ -223,6 +227,10 @@ export async function POST(req: Request) {
           totalLinesChanged: githubData.totalLinesChanged,
           stars: githubData.stars,
           repos: githubData.repos,
+          currentStreak: githubData.currentStreak,
+          longestStreak: githubData.longestStreak,
+          activeDays: githubData.activeDays,
+          totalRepositoriesImpacted: githubData.totalRepositoriesImpacted
         },
         achievements: updatedUser?.achievements || [],
         timeRange,

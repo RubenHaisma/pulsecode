@@ -83,6 +83,10 @@ export interface Stats {
   reviews?: number;
   privateRepos?: number;
   publicRepos?: number;
+  currentStreak?: number;
+  longestStreak?: number;
+  activeDays?: number;
+  totalRepositoriesImpacted?: number;
 }
 
 // Mock achievement data
@@ -274,6 +278,10 @@ export default function DashboardPage() {
           reviews: statsData.stats.reviews || 0,
           privateRepos: statsData.stats.privateRepos || 0,
           publicRepos: statsData.stats.publicRepos || 0,
+          currentStreak: statsData.stats.currentStreak || 0,
+          longestStreak: statsData.stats.longestStreak || 0,
+          activeDays: statsData.stats.activeDays || 0,
+          totalRepositoriesImpacted: statsData.stats.totalRepositoriesImpacted || 0,
         });
       }
       
@@ -741,46 +749,49 @@ export default function DashboardPage() {
 
               <Card className="neon-border bg-black/60">
                 <CardHeader className="pb-2">
-                  <CardTitle>Coding Streak</CardTitle>
+                  <CardTitle className="text-sm font-medium">Coding Streak</CardTitle>
                   <CardDescription>Days of consistency</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center">
-                    <Flame className="h-8 w-8 text-orange-500 mr-3" />
-                    <div className="text-3xl font-bold">{stats.streak}</div>
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-3xl font-bold">{stats.currentStreak || stats.streak || 0}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {stats.longestStreak ? `Best: ${stats.longestStreak}` : ''}
+                    </div>
                   </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Current streak
+                  </div>
+                  {stats.activeDays ? (
+                    <div className="mt-4 text-sm">
+                      <span className="font-medium">{stats.activeDays}</span> active days in past year
+                    </div>
+                  ) : null}
                 </CardContent>
-                <CardFooter className="text-xs text-muted-foreground">
-                  <Badge variant="outline" className="neon-glow">
-                    {stats.timeRange !== 'all' ? getTimeRangeLabel(stats.timeRange || 'all') : "Current streak"}
-                  </Badge>
-                </CardFooter>
               </Card>
 
               <Card className="neon-border bg-black/60">
                 <CardHeader className="pb-2">
-                  <CardTitle>Code Impact</CardTitle>
+                  <CardTitle className="text-sm font-medium">Code Impact</CardTitle>
                   <CardDescription>Total contributions</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center">
-                    <Code2 className="h-8 w-8 text-blue-500 mr-3" />
-                    <div className="text-3xl font-bold">
-                      {stats.contributions ? 
-                        stats.contributions > 1000 
-                          ? `${(stats.contributions / 1000).toFixed(1)}k` 
-                          : stats.contributions 
-                        : 0}
-                    </div>
+                  <div className="text-3xl font-bold">
+                    {stats.totalLinesChanged ? 
+                      (stats.totalLinesChanged > 1000 
+                        ? `${(stats.totalLinesChanged / 1000).toFixed(1)}k` 
+                        : stats.totalLinesChanged.toLocaleString()) 
+                      : '0'}
                   </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Lines of code changed
+                  </div>
+                  {stats.repos ? (
+                    <div className="mt-4 text-sm">
+                      Across <span className="font-medium">{stats.totalRepositoriesImpacted || stats.repos}</span> repositories
+                    </div>
+                  ) : null}
                 </CardContent>
-                <CardFooter className="text-xs text-muted-foreground">
-                  <Badge variant="outline" className="neon-glow">
-                    {stats.timeRange !== 'all' ? getTimeRangeLabel(stats.timeRange || 'all') : (
-                      stats.contributions ? `Across ${stats.repos || 0} repositories` : "No contributions yet"
-                    )}
-                  </Badge>
-                </CardFooter>
               </Card>
 
               <Card className="neon-border bg-black/60">

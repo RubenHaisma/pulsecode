@@ -147,6 +147,10 @@ export interface GitHubUserData {
   reviews?: number;
   privateRepos?: number;
   publicRepos?: number;
+  currentStreak?: number;
+  longestStreak?: number;
+  activeDays?: number;
+  totalRepositoriesImpacted?: number;
 }
 
 export type TimeRange = 'today' | 'week' | 'month' | 'year' | 'all';
@@ -329,10 +333,10 @@ async function fetchAllOrgRepositories(
         const { data: reposPage } = await withRateLimit(() => 
           octokit.repos.listForOrg({
             org: orgName,
-            per_page: 100,
+        per_page: 100,
             page: page,
-            sort: "updated",
-            headers
+        sort: "updated",
+        headers
           })
         );
         
@@ -387,8 +391,8 @@ async function getAllUserOrganizations(
     try {
       const { data: authOrgs } = await withRateLimit(() => 
         octokit.orgs.listForAuthenticatedUser({
-          per_page: 100,
-          headers
+            per_page: 100,
+            headers
         })
       );
       
@@ -406,8 +410,8 @@ async function getAllUserOrganizations(
       const { data: publicOrgs } = await withRateLimit(() => 
         octokit.orgs.listForUser({
           username: githubUsername,
-          per_page: 100,
-          headers
+                per_page: 100,
+                headers
         })
       );
       
@@ -455,8 +459,8 @@ async function getAllUserOrganizations(
         await withRateLimit(() => 
           octokit.orgs.checkMembershipForUser({
             org: orgName,
-            username: githubUsername,
-            headers
+        username: githubUsername,
+        headers
           })
         );
         
@@ -513,14 +517,14 @@ async function processRepositoriesInParallel(
   
   // Process in smaller batches to avoid rate limits
   const batchSize = 5;
-  let totalCommits = 0;
-  let totalLinesChanged = 0;
+    let totalCommits = 0;
+    let totalLinesChanged = 0;
   let totalPRs = 0;
   let openPRs = 0;
   let mergedPRs = 0;
   let reviews = 0;
-  let contributions = 0;
-  
+    let contributions = 0;
+
   // Process in batches with delays between batches
   for (let i = 0; i < reposToProcess.length; i += batchSize) {
     const batch = reposToProcess.slice(i, i + batchSize);
@@ -605,23 +609,23 @@ async function getRepositoryCommits(
   startDate: Date,
   endDate: Date
 ): Promise<{ commits: number; linesChanged: number }> {
-  try {
-    console.log(`Processing repo: ${repo.full_name}, Private: ${repo.private}`);
-    
-    // Apply time range to commit query if specified
-    const commitQueryParams: any = {
-      owner: repo.owner.login,
-      repo: repo.name,
-      author: githubUsername,
-      per_page: 100,
-      headers
-    };
-    
-    if (timeRange !== 'all') {
-      commitQueryParams.since = startDate.toISOString();
-      commitQueryParams.until = endDate.toISOString();
-    }
-    
+      try {
+        console.log(`Processing repo: ${repo.full_name}, Private: ${repo.private}`);
+        
+        // Apply time range to commit query if specified
+        const commitQueryParams: any = {
+          owner: repo.owner.login,
+          repo: repo.name,
+          author: githubUsername,
+          per_page: 100,
+          headers
+        };
+        
+        if (timeRange !== 'all') {
+          commitQueryParams.since = startDate.toISOString();
+          commitQueryParams.until = endDate.toISOString();
+        }
+        
     // Get commits with pagination
     let allCommits: any[] = [];
     let page = 1;
@@ -662,10 +666,10 @@ async function getRepositoryCommits(
       const commitDataPromises = commitSample.map(commit =>
         withRateLimit(() => 
           octokit.repos.getCommit({
-            owner: repo.owner.login,
-            repo: repo.name,
-            ref: commit.sha,
-            headers
+              owner: repo.owner.login,
+              repo: repo.name,
+              ref: commit.sha,
+              headers
           })
         ).catch(error => {
           console.error(`Error fetching commit details for ${commit.sha}:`, error);
@@ -697,7 +701,7 @@ async function getRepositoryCommits(
       commits: allCommits.length,
       linesChanged: 0
     };
-  } catch (error) {
+      } catch (error) {
     console.error(`Error processing commits for ${repo.full_name}:`, error);
     return {
       commits: 0,
@@ -715,23 +719,23 @@ async function getRepositoryPRs(
   startDate: Date,
   endDate: Date
 ): Promise<{ prs: number; openPRs: number; mergedPRs: number; reviews: number }> {
-  try {
-    // Get PRs created by user
+      try {
+        // Get PRs created by user
     let allPRs: any[] = [];
     let prPage = 1;
     let hasMorePRPages = true;
     
     // Paginate to get PRs, limited to 2 pages per repo
     while (hasMorePRPages && prPage <= 2) {
-      const prQueryParams: any = {
-        owner: repo.owner.login,
-        repo: repo.name,
-        state: "all",
-        per_page: 100,
+        const prQueryParams: any = {
+          owner: repo.owner.login,
+          repo: repo.name,
+          state: "all",
+          per_page: 100,
         page: prPage,
-        headers
-      };
-      
+          headers
+        };
+        
       try {
         const { data: pullRequestsPage } = await withRateLimit(() => 
           octokit.pulls.list(prQueryParams)
@@ -752,18 +756,18 @@ async function getRepositoryPRs(
     }
     
     const filteredPRs = allPRs.filter(pr => {
-      if (!pr.user || pr.user.login.toLowerCase() !== githubUsername.toLowerCase()) {
-        return false;
-      }
-      
-      if (timeRange !== 'all') {
-        const prDate = new Date(pr.created_at);
-        return prDate >= startDate && prDate <= endDate;
-      }
-      
-      return true;
-    });
-    
+          if (!pr.user || pr.user.login.toLowerCase() !== githubUsername.toLowerCase()) {
+            return false;
+          }
+          
+          if (timeRange !== 'all') {
+            const prDate = new Date(pr.created_at);
+            return prDate >= startDate && prDate <= endDate;
+          }
+          
+          return true;
+        });
+        
     console.log(`Found ${filteredPRs.length} PRs by user in ${repo.name}`);
     
     // Get PR reviews
@@ -773,28 +777,28 @@ async function getRepositoryPRs(
     try {
       const { data: repoPRs } = await withRateLimit(() => 
         octokit.pulls.list({
-          owner: repo.owner.login,
-          repo: repo.name,
-          state: "all",
+            owner: repo.owner.login,
+            repo: repo.name,
+            state: "all",
           per_page: 20,
-          headers
+            headers
         })
       );
-      
-      // Check for reviews on each PR
+          
+          // Check for reviews on each PR
       const reviewPromises = repoPRs.map(pr => 
         withRateLimit(() => 
           octokit.pulls.listReviews({
-            owner: repo.owner.login,
-            repo: repo.name,
-            pull_number: pr.number,
-            headers
+                owner: repo.owner.login,
+                repo: repo.name,
+                pull_number: pr.number,
+                headers
           })
         ).then(response => {
           const userReviews = response.data.filter(review => 
-            review.user && review.user.login.toLowerCase() === githubUsername.toLowerCase()
-          );
-          
+                review.user && review.user.login.toLowerCase() === githubUsername.toLowerCase()
+              );
+              
           // Filter reviews by time range if needed
           return userReviews.filter(review => {
             if (timeRange !== 'all' && review.submitted_at) {
@@ -811,11 +815,11 @@ async function getRepositoryPRs(
       
       const allReviews = await Promise.all(reviewPromises);
       userReviewCount = allReviews.reduce((acc, reviews) => acc + reviews.length, 0);
-      
-      console.log(`Found ${userReviewCount} reviews by user in ${repo.name}`);
-    } catch (error) {
-      console.error(`Error fetching PR reviews for ${repo.name}:`, error);
-    }
+          
+          console.log(`Found ${userReviewCount} reviews by user in ${repo.name}`);
+        } catch (error) {
+          console.error(`Error fetching PR reviews for ${repo.name}:`, error);
+        }
     
     return {
       prs: filteredPRs.length,
@@ -823,7 +827,7 @@ async function getRepositoryPRs(
       mergedPRs: filteredPRs.filter(pr => pr.merged_at !== null).length,
       reviews: userReviewCount
     };
-  } catch (error) {
+      } catch (error) {
     console.error(`Error processing PRs for ${repo.name}:`, error);
     return {
       prs: 0,
@@ -1114,6 +1118,312 @@ async function discoverUserRepositories(
 }
 
 /**
+ * Calculate coding streak based on daily contributions
+ * Returns both current streak and longest streak
+ */
+interface StreakData {
+  currentStreak: number;
+  longestStreak: number;
+  lastActiveDate: Date | null;
+  activeDays: Map<string, number>; // Key: ISO date string, Value: contribution count
+}
+
+async function calculateCodingStreak(
+  octokit: Octokit,
+  githubUsername: string,
+  startDate?: Date // Optional: if we want to limit the calculation range
+): Promise<StreakData> {
+  const activeDays = new Map<string, number>();
+  const now = new Date();
+  let startDateToUse = startDate;
+  
+  if (!startDateToUse) {
+    // Default to looking back 365 days if no start date specified
+    startDateToUse = new Date();
+    startDateToUse.setDate(startDateToUse.getDate() - 365);
+  }
+  
+  // Format dates for GitHub API
+  const since = startDateToUse.toISOString();
+  
+  try {
+    // Use GraphQL to get contribution data - more efficient than multiple REST calls
+    const query = `
+      query($username: String!, $from: DateTime!) {
+        user(login: $username) {
+          contributionsCollection(from: $from) {
+            contributionCalendar {
+              totalContributions
+              weeks {
+                contributionDays {
+                  date
+                  contributionCount
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+    
+    const variables = {
+      username: githubUsername,
+      from: since
+    };
+    
+    // Execute the GraphQL query
+    const result: any = await octokit.graphql(query, variables);
+    
+    if (result?.user?.contributionsCollection?.contributionCalendar?.weeks) {
+      // Process the contribution calendar
+      const weeks = result.user.contributionsCollection.contributionCalendar.weeks;
+      
+      for (const week of weeks) {
+        for (const day of week.contributionDays) {
+          if (day.contributionCount > 0) {
+            activeDays.set(day.date, day.contributionCount);
+          }
+        }
+      }
+    }
+    
+    // Calculate current streak
+    let currentStreak = 0;
+    let lastActiveDate: Date | null = null;
+    
+    // Start from today and go backward
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    for (let i = 0; i < 366; i++) { // Check up to a year back
+      const checkDate = new Date(today);
+      checkDate.setDate(today.getDate() - i);
+      
+      const dateString = checkDate.toISOString().split('T')[0];
+      
+      if (activeDays.has(dateString)) {
+        if (i === 0 || currentStreak > 0) {
+          currentStreak++;
+          if (!lastActiveDate) {
+            lastActiveDate = new Date(checkDate);
+          }
+        }
+      } else {
+        // Break on first day with no activity (for current streak)
+        if (i === 0 || currentStreak > 0) {
+          break;
+        }
+      }
+    }
+    
+    // Calculate longest streak
+    let longestStreak = 0;
+    let currentLongestCount = 0;
+    
+    // Sort dates and iterate in order
+    const sortedDates = Array.from(activeDays.keys()).sort();
+    
+    for (let i = 0; i < sortedDates.length; i++) {
+      const currentDate = new Date(sortedDates[i]);
+      
+      if (i > 0) {
+        const prevDate = new Date(sortedDates[i-1]);
+        // Check if dates are consecutive
+        const dayDiff = Math.floor((currentDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (dayDiff === 1) {
+          // Consecutive day, increment streak
+          currentLongestCount++;
+        } else {
+          // Gap found, reset counter
+          currentLongestCount = 1;
+        }
+      } else {
+        // First day with activity
+        currentLongestCount = 1;
+      }
+      
+      // Update longest streak if current is longer
+      if (currentLongestCount > longestStreak) {
+        longestStreak = currentLongestCount;
+      }
+    }
+    
+    return {
+      currentStreak,
+      longestStreak,
+      lastActiveDate,
+      activeDays
+    };
+  } catch (error) {
+    console.error("Error calculating coding streak:", error);
+    return {
+      currentStreak: 0,
+      longestStreak: 0,
+      lastActiveDate: null,
+      activeDays: new Map()
+    };
+  }
+}
+
+/**
+ * Calculate total code impact (added/changed lines) with more accuracy
+ */
+async function calculateCodeImpact(
+  octokit: Octokit,
+  githubUsername: string,
+  repositories: any[]
+): Promise<{ totalLinesChanged: number; totalRepositories: number; detailedImpact: Map<string, number> }> {
+  const detailedImpact = new Map<string, number>();
+  let totalLinesChanged = 0;
+  
+  try {
+    // Calculate impact across all repos
+    console.log(`Calculating code impact across ${repositories.length} repositories`);
+    
+    // Use a smarter sampling approach for large repository lists
+    const sortedRepos = [...repositories].sort((a, b) => {
+      // Prioritize repos with recent activity
+      const dateA = new Date(a.updated_at || a.pushed_at || "2000-01-01");
+      const dateB = new Date(b.updated_at || b.pushed_at || "2000-01-01");
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    // Process repositories in batches to avoid rate limits
+    const batchSize = 10; // Process 10 repos at a time
+    const totalReposToProcess = Math.min(100, sortedRepos.length); // Cap at 100 repos for performance
+    
+    for (let i = 0; i < totalReposToProcess; i += batchSize) {
+      const batch = sortedRepos.slice(i, Math.min(i + batchSize, totalReposToProcess));
+      
+      // Process this batch in parallel with rate limiting
+      await Promise.all(batch.map(async (repo) => {
+        try {
+          // Get all commits by user for this repo
+          const repoName = repo.name;
+          const repoOwner = repo.owner.login;
+          
+          let allCommits: any[] = [];
+          let page = 1;
+          let hasMorePages = true;
+          
+          while (hasMorePages && page <= 5) { // Limit to 5 pages (500 commits)
+            try {
+              const { data: commits } = await withRateLimit(() => 
+                octokit.repos.listCommits({
+                  owner: repoOwner,
+                  repo: repoName,
+                  author: githubUsername,
+                  per_page: 100,
+                  page: page,
+                  headers
+                })
+              );
+              
+              if (commits.length > 0) {
+                allCommits = [...allCommits, ...commits];
+              }
+              
+              hasMorePages = commits.length === 100;
+              page++;
+            } catch (error) {
+              console.error(`Error fetching commits for ${repoOwner}/${repoName} page ${page}:`, error);
+              hasMorePages = false;
+            }
+          }
+          
+          // For each repo, get detailed stats for a sample of commits
+          let commitSampleSize = 0;
+          if (allCommits.length <= 10) {
+            // For repos with few commits, analyze all commits
+            commitSampleSize = allCommits.length;
+          } else if (allCommits.length <= 100) {
+            // For medium-sized repos, analyze 25% of commits
+            commitSampleSize = Math.max(10, Math.floor(allCommits.length * 0.25));
+          } else {
+            // For large repos, analyze 10% with at least 15 commits
+            commitSampleSize = Math.max(15, Math.floor(allCommits.length * 0.1));
+          }
+          
+          // Distribute the sample throughout the commit history
+          const sampledCommits = [];
+          const commitCount = allCommits.length;
+          
+          if (commitCount > 0 && commitSampleSize > 0) {
+            // Take samples distributed evenly through the commit history
+            const step = commitCount / commitSampleSize;
+            
+            for (let j = 0; j < commitSampleSize; j++) {
+              const index = Math.min(Math.floor(j * step), commitCount - 1);
+              sampledCommits.push(allCommits[index]);
+            }
+          }
+          
+          // Get detailed stats for each sampled commit
+          let repoLinesChanged = 0;
+          let analyzedCommits = 0;
+          
+          for (const commit of sampledCommits) {
+            try {
+              const { data: commitData } = await withRateLimit(() => 
+                octokit.repos.getCommit({
+                  owner: repoOwner,
+                  repo: repoName,
+                  ref: commit.sha,
+                  headers
+                })
+              );
+              
+              if (commitData.stats) {
+                const changes = (commitData.stats.additions || 0) + (commitData.stats.deletions || 0);
+                repoLinesChanged += changes;
+                analyzedCommits++;
+              }
+            } catch (error) {
+              console.error(`Error fetching stats for commit ${commit.sha}:`, error);
+            }
+          }
+          
+          // Extrapolate total impact if we sampled
+          if (analyzedCommits > 0) {
+            const averageChangesPerCommit = repoLinesChanged / analyzedCommits;
+            const estimatedTotalChanges = Math.round(averageChangesPerCommit * allCommits.length);
+            
+            // Store detailed impact per repo
+            detailedImpact.set(`${repoOwner}/${repoName}`, estimatedTotalChanges);
+            
+            // Add to total
+            totalLinesChanged += estimatedTotalChanges;
+            
+            console.log(`Repo ${repoOwner}/${repoName}: ${allCommits.length} commits, ~${estimatedTotalChanges} lines changed`);
+          }
+        } catch (error) {
+          console.error(`Error processing code impact for ${repo.full_name}:`, error);
+        }
+      }));
+      
+      // Brief pause between batches to avoid rate limits
+      if (i + batchSize < totalReposToProcess) {
+        await delay(1000);
+      }
+    }
+    
+    return {
+      totalLinesChanged,
+      totalRepositories: repositories.length,
+      detailedImpact
+    };
+  } catch (error) {
+    console.error("Error calculating code impact:", error);
+    return {
+      totalLinesChanged: 0,
+      totalRepositories: repositories.length,
+      detailedImpact
+    };
+  }
+}
+
+/**
  * Fetch GitHub stats for a user with time range filtering
  */
 export async function getGitHubUserStats(
@@ -1342,72 +1652,24 @@ export async function getGitHubUserStats(
 
     // Calculate stars received (stars don't change based on time range)
     const totalStars = repos.reduce((acc, repo) => acc + (repo.stargazers_count || 0), 0);
-
-    if (updateProgress) updateProgress('finalizing', 0, 100, 'Calculating final statistics');
-
-    // Get last activity date from most recent commit or PR
-    const lastActivityDates = [];
-    if (totalCommits > 0) {
-      try {
-        // Get most recent commit within the time range
-        let dateQueryStr = '';
-        if (timeRange !== 'all') {
-          dateQueryStr = ` author-date:${formatDateForGitHub(startDate)}..${formatDateForGitHub(endDate)}`;
-        }
-        
-        const commitQuery = `author:${githubUsername}${dateQueryStr}`;
-        const { data: recentCommits } = await octokit.search.commits({
-          q: commitQuery,
-          sort: "author-date",
-          order: "desc",
-          per_page: 1,
-        });
-        
-        if (recentCommits.items.length > 0) {
-          lastActivityDates.push(new Date(recentCommits.items[0].commit.author.date));
-        }
-      } catch (error) {
-        console.error("Error fetching recent commits:", error);
-      }
-    }
-
-    // Calculate streak (improved version)
-    let streak = 0;
-    const now = new Date();
-    const lastActivity = lastActivityDates.length > 0 
-      ? new Date(Math.max(...lastActivityDates.map(d => d.getTime())))
-      : undefined;
-      
-    if (lastActivity) {
-      const daysSinceLastActivity = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysSinceLastActivity === 0) {
-        // If active today, check the past week
-        try {
-          const sevenDaysAgo = new Date();
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-          
-          const streakQuery = `author:${githubUsername} author-date:>${formatDateForGitHub(sevenDaysAgo)}`;
-          const { data: recentActivity } = await octokit.search.commits({
-            q: streakQuery,
-            per_page: 100,
-          });
-          
-          // Get unique days with activity
-          const activeDays = new Set();
-          recentActivity.items.forEach(item => {
-            const date = new Date(item.commit.author.date).toISOString().split('T')[0];
-            activeDays.add(date);
-          });
-          
-          streak = activeDays.size;
-        } catch (error) {
-          console.error("Error calculating streak:", error);
-        }
-      }
-    }
-
+    
+    if (updateProgress) updateProgress('calculating-streak', 0, 100, 'Analyzing your coding streak patterns');
+    
+    // Calculate coding streak data
+    const streakData = await calculateCodingStreak(octokit, githubUsername);
+    
+    if (updateProgress) updateProgress('calculating-streak', 100, 100, 'Streak analysis complete');
+    
+    if (updateProgress) updateProgress('calculating-impact', 0, 100, 'Measuring your code impact across repositories');
+    
+    // Calculate code impact more accurately
+    const impactData = await calculateCodeImpact(octokit, githubUsername, repos);
+    
+    if (updateProgress) updateProgress('calculating-impact', 100, 100, 'Code impact analysis complete');
+    
+    // Integrate new data with existing stats
     if (updateProgress) updateProgress('finalizing', 100, 100, 'Analysis complete!');
-
+    
     return {
       commits: totalCommits,
       pullRequests: totalPRs,
@@ -1415,14 +1677,18 @@ export async function getGitHubUserStats(
       openPullRequests: openPRs,
       stars: totalStars,
       repos: repos.length,
-      streak,
-      totalLinesChanged,
-      lastActivity,
+      streak: streakData.currentStreak, // Use current streak as the main streak value
+      totalLinesChanged: impactData.totalLinesChanged,
+      lastActivity: streakData.lastActiveDate || undefined, // Convert null to undefined to satisfy type
       timeRange,
       contributions,
       reviews,
       privateRepos: privateRepos,
       publicRepos: publicRepos,
+      currentStreak: streakData.currentStreak,
+      longestStreak: streakData.longestStreak,
+      activeDays: streakData.activeDays.size,
+      totalRepositoriesImpacted: impactData.totalRepositories
     };
   } catch (error) {
     console.error("Error fetching GitHub user stats:", error);
@@ -1441,6 +1707,10 @@ export async function getGitHubUserStats(
       reviews: 0,
       privateRepos: 0,
       publicRepos: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      activeDays: 0,
+      totalRepositoriesImpacted: 0
     };
   }
 }
@@ -1736,7 +2006,7 @@ export async function updateGitHubUserData(
       if (enhancedProgressCallback) {
         enhancedProgressCallback('saving', 50, 100, 'Checking for achievements');
       }
-
+      
       // Check for achievements
       const { checkAndAwardAchievements } = await import('./achievements');
       await checkAndAwardAchievements(userId);
