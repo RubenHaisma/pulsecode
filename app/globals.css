@@ -84,6 +84,31 @@
     }
   }
 
+  @keyframes progress {
+    0% {
+      width: 0%;
+    }
+    10% {
+      width: 10%;
+    }
+    50% {
+      width: 60%;
+    }
+    80% {
+      width: 80%;
+    }
+    95% {
+      width: 96%;
+    }
+    100% {
+      width: 100%;
+    }
+  }
+
+  .animate-progress {
+    animation: progress 3s ease-in-out infinite;
+  }
+
   .glitch {
     animation: glitch 1s linear infinite;
     position: relative;

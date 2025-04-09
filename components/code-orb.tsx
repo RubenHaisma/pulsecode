@@ -1,42 +1,74 @@
 "use client"
 
-import { useRef } from "react"
-import { Canvas, useFrame } from "@react-three/fiber"
-import { Sphere, MeshDistortMaterial } from "@react-three/drei"
-import * as THREE from "three"
+import { useRef, useState, useEffect, ReactNode } from "react"
+import dynamic from 'next/dynamic'
+import { Loader2, Code2 } from "lucide-react"
 
-function OrbMesh() {
-  const meshRef = useRef<THREE.Mesh>(null)
+// Create a fallback component for when Three.js is loading
+const OrbFallback = () => (
+  <div className="w-48 h-48 flex items-center justify-center">
+    <div className="rounded-full w-32 h-32 bg-gradient-to-br from-pink-500 to-purple-700 animate-pulse flex items-center justify-center">
+      <Loader2 className="h-8 w-8 text-white animate-spin" />
+    </div>
+  </div>
+)
 
-  useFrame((state) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.x = state.clock.getElapsedTime() * 0.2
-      meshRef.current.rotation.y = state.clock.getElapsedTime() * 0.3
-    }
-  })
+// Simple fallback when errors occur
+const SimpleOrb = () => (
+  <div className="w-48 h-48 flex items-center justify-center">
+    <div className="rounded-full w-32 h-32 bg-gradient-to-br from-pink-500 to-purple-700 flex items-center justify-center">
+      <Code2 className="h-10 w-10 text-white" />
+    </div>
+  </div>
+);
 
-  return (
-    <Sphere ref={meshRef} args={[1, 64, 64]}>
-      <MeshDistortMaterial
-        color="#ff0099"
-        attach="material"
-        distort={0.4}
-        speed={2}
-        roughness={0}
-        metalness={1}
-      />
-    </Sphere>
-  )
+// Dynamically import the Three.js components with SSR disabled
+const ThreeOrb = dynamic(
+  () => import('./three-orb').then((mod) => mod.ThreeOrb).catch(() => () => <SimpleOrb />),
+  { 
+    ssr: false,
+    loading: OrbFallback
+  }
+)
+
+// Define props for our error boundary
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallback: ReactNode;
 }
 
+// Simple error boundary component
+function CustomErrorBoundary({ children, fallback }: ErrorBoundaryProps) {
+  const [hasError, setHasError] = useState(false)
+  
+  useEffect(() => {
+    const errorHandler = (error: ErrorEvent) => {
+      console.error('Three.js error caught:', error)
+      setHasError(true)
+    }
+    
+    window.addEventListener('error', errorHandler)
+    
+    return () => {
+      window.removeEventListener('error', errorHandler)
+    }
+  }, [])
+  
+  if (hasError) {
+    return <>{fallback}</>
+  }
+  
+  try {
+    return <>{children}</>
+  } catch (error) {
+    console.error('Error rendering ThreeOrb:', error)
+    return <>{fallback}</>
+  }
+}
+
+// Export a simple wrapper component
 export function CodeOrb() {
-  return (
-    <div className="w-48 h-48">
-      <Canvas camera={{ position: [0, 0, 3] }}>
-        <ambientLight intensity={0.5} />
-        <pointLight position={[10, 10, 10]} />
-        <OrbMesh />
-      </Canvas>
-    </div>
-  )
+  return <CustomErrorBoundary fallback={<SimpleOrb />}>
+    <ThreeOrb />
+  </CustomErrorBoundary>
 }

@@ -17,13 +17,9 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-4">
               <Link href="/login">
-                <Button variant="ghost" className="neon-button">
-                  Login
-                </Button>
-              </Link>
-              <Link href="/signup">
                 <Button className="neon-button bg-pink-500 hover:bg-pink-600">
-                  Get Started
+                  <Github className="mr-2 h-4 w-4" />
+                  Sign in with GitHub
                 </Button>
               </Link>
             </div>

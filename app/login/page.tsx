@@ -1,104 +1,92 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { motion } from "framer-motion"
-import { Github } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { useToast } from "@/hooks/use-toast"
-import Link from "next/link"
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Github, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { signIn, useSession } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+  const { status } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Check for authentication errors
+  useEffect(() => {
+    const error = searchParams.get("error");
+    if (error) {
+      let errorMessage = "An error occurred during sign in.";
+      
+      // Handle specific error types
+      if (error === "OAuthAccountNotLinked") {
+        errorMessage = "This account is already linked to another login method.";
+      } else if (error === "AccessDenied") {
+        errorMessage = "Access was denied. Please try again.";
+      } else if (error === "Callback") {
+        errorMessage = "There was a problem with the authentication callback.";
+      }
+      
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: errorMessage,
+      });
+    }
+  }, [searchParams, toast]);
+
+  if (status === "authenticated") {
+    router.push("/dashboard");
+    return null;
+  }
 
   const handleGitHubLogin = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      // GitHub OAuth logic will go here
-      toast({
-        title: "Coming soon!",
-        description: "GitHub authentication will be available shortly.",
-      })
+      await signIn("github", { callbackUrl: "/dashboard" });
     } catch (error) {
+      // This will rarely be caught since OAuth redirects
       toast({
         variant: "destructive",
         title: "Error",
         description: "Something went wrong. Please try again.",
-      })
-    } finally {
-      setIsLoading(false)
+      });
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background-start to-background-end">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md p-8 space-y-8 bg-black/60 backdrop-blur-xl rounded-lg border border-white/10"
       >
-        <div className="neon-border p-8">
-          <h2 className="text-2xl font-bold pixel-font text-center mb-8 neon-glow">
-            Login to PulseCode
-          </h2>
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-white">Welcome to PulseCode</h1>
+          <p className="mt-2 text-muted-foreground">
+            Sign in with your GitHub account to track your coding journey
+          </p>
+        </div>
 
-          <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                className="mt-1"
-              />
-            </div>
-
-            <Button className="w-full neon-button bg-pink-500 hover:bg-pink-600">
-              Login
-            </Button>
-
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-white/10" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background-start px-2 text-gray-400">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              className="w-full neon-button"
-              onClick={handleGitHubLogin}
-              disabled={isLoading}
-            >
+        <div className="space-y-4">
+          <Button
+            className="w-full neon-button bg-black/60 hover:bg-black/80"
+            onClick={handleGitHubLogin}
+            disabled={isLoading || status === "loading"}
+          >
+            {isLoading || status === "loading" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
               <Github className="mr-2 h-4 w-4" />
-              GitHub
-            </Button>
-
-            <p className="text-center text-sm text-gray-400 mt-6">
-              Don&apos;t have an account?{" "}
-              <Link href="/signup" className="text-pink-500 hover:text-pink-400">
-                Sign up
-              </Link>
-            </p>
-          </form>
+            )}
+            Sign in with GitHub
+          </Button>
         </div>
       </motion.div>
     </div>
-  )
+  );
 }
