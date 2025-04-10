@@ -47,7 +47,7 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
-          scope: requiredGitHubScopes.join(' ')
+          scope: "read:user user:email repo"
         }
       },
       profile(profile) {
@@ -111,7 +111,7 @@ export const authOptions: NextAuthOptions = {
               where: { id: existingUserWithEmail.id },
               data: {
                 githubId: user.id,
-                githubUsername: profile.login,
+                githubUsername: profile?.login || "",
               },
             });
             
@@ -152,7 +152,7 @@ export const authOptions: NextAuthOptions = {
                 name: user.name || undefined,
                 image: user.image || undefined,
                 githubId: user.id,
-                githubUsername: profile.login,
+                githubUsername: profile?.login || "",
               },
             });
           }

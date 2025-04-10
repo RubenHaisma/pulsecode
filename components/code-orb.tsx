@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, ReactNode } from "react"
 import dynamic from 'next/dynamic'
 import { Loader2, Code2 } from "lucide-react"
+import { useSession } from "next-auth/react"
 
 // Create a fallback component for when Three.js is loading
 const OrbFallback = () => (
@@ -12,19 +13,34 @@ const OrbFallback = () => (
     </div>
   </div>
 )
+OrbFallback.displayName = 'OrbFallback';
 
-// Simple fallback when errors occur
-const SimpleOrb = () => (
-  <div className="w-48 h-48 flex items-center justify-center">
-    <div className="rounded-full w-32 h-32 bg-gradient-to-br from-pink-500 to-purple-700 flex items-center justify-center">
-      <Code2 className="h-10 w-10 text-white" />
+// Profile orb that uses the user's avatar
+const ProfileOrb = () => {
+  const { data: session } = useSession();
+  
+  const getInitials = (name: string | null | undefined): string => 
+    name?.split(' ').map(n => n[0]).join('') || 'U';
+  
+  return (
+    <div className="w-48 h-48 flex items-center justify-center">
+      <div className="rounded-full w-32 h-32 bg-gradient-to-br from-pink-500 to-purple-700 animate-pulse p-1">
+        <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          {session?.user?.image ? (
+            <img src={session.user.image} alt="Profile" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-white text-2xl font-bold">{getInitials(session?.user?.name)}</span>
+          )}
+        </div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
+ProfileOrb.displayName = 'ProfileOrb';
 
 // Dynamically import the Three.js components with SSR disabled
 const ThreeOrb = dynamic(
-  () => import('./three-orb').then((mod) => mod.ThreeOrb).catch(() => () => <SimpleOrb />),
+  () => import('./three-orb').then((mod) => mod.ThreeOrb).catch(() => () => <ProfileOrb />),
   { 
     ssr: false,
     loading: OrbFallback
@@ -65,10 +81,11 @@ function CustomErrorBoundary({ children, fallback }: ErrorBoundaryProps) {
     return <>{fallback}</>
   }
 }
+CustomErrorBoundary.displayName = 'CustomErrorBoundary';
 
 // Export a simple wrapper component
 export function CodeOrb() {
-  return <CustomErrorBoundary fallback={<SimpleOrb />}>
+  return <CustomErrorBoundary fallback={<ProfileOrb />}>
     <ThreeOrb />
   </CustomErrorBoundary>
 }

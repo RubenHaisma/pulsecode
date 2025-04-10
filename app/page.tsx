@@ -37,7 +37,7 @@ export default function Home() {
           >
             Level Up Your
             <br />
-            #BuildInPublic Journey
+            Vibe Code Journey
           </motion.h1>
           
           <motion.p 

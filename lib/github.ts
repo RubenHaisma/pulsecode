@@ -235,6 +235,7 @@ async function withRateLimit<T>(
 ): Promise<T> {
   let retries = 0;
   let delayMs = initialDelayMs;
+  const maxWaitTime = 60000; // Maximum wait time of 1 minute
   
   while (true) {
     try {
@@ -245,7 +246,7 @@ async function withRateLimit<T>(
         (error.message?.includes('rate limit') || error.message?.includes('API rate'));
       
       // If it's not a rate limit error or we've exceeded max retries, throw
-      if (!isRateLimit || retries >= maxRetries) {
+      if (!isRateLimit || retries >= maxRetries || delayMs > maxWaitTime) {
         throw error;
       }
       
@@ -261,40 +262,154 @@ async function withRateLimit<T>(
 }
 
 /**
- * Helper function for parallel processing of async tasks with rate limit and concurrency control
+ * Helper function for parallel processing of async tasks with enhanced concurrency control
  */
-async function processInParallel<T, R>(
+async function processInParallelWithProgress<T, R>(
   items: T[],
-  processItem: (item: T) => Promise<R>,
-  concurrency: number = 5,
-  updateProgress?: (completed: number, total: number) => void
+  processItem: (item: T, index: number) => Promise<R>,
+  options: {
+    concurrency?: number;
+    batchSize?: number;
+    updateProgress?: (completed: number, total: number, currentItem?: string) => void;
+    retryDelayMs?: number;
+    maxRetries?: number;
+  } = {}
 ): Promise<R[]> {
+  const {
+    concurrency = 10,
+    batchSize = 20,
+    updateProgress,
+    retryDelayMs = 1000,
+    maxRetries = 3
+  } = options;
+  
   const results: R[] = [];
   let completedCount = 0;
   const total = items.length;
-
-  // Process items in chunks based on concurrency
-  for (let i = 0; i < total; i += concurrency) {
-    const chunk = items.slice(i, i + concurrency);
-    const chunkPromises = chunk.map(item => {
-      return withRateLimit(() => processItem(item))
-        .catch(error => {
-          console.error(`Error processing item:`, error);
-          return null as unknown as R; // Return null for failed items
-        });
-    });
-
-    // Wait for all promises in the current chunk to resolve
-    const chunkResults = await Promise.all(chunkPromises);
-    results.push(...chunkResults);
+  
+  // Process in batches to avoid overwhelming the API
+  for (let i = 0; i < total; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults: R[] = [];
     
-    // Update progress if callback is provided
-    completedCount += chunk.length;
-    if (updateProgress) {
-      updateProgress(completedCount, total);
+    // Process each batch with controlled concurrency
+    const processBatch = async () => {
+      const queue = [...batch];
+      const inProgress = new Set();
+      
+      // Function to process next item in queue
+      const processNext = async () => {
+        if (queue.length === 0) return;
+        
+        const item = queue.shift()!;
+        const index = items.indexOf(item);
+        inProgress.add(index);
+        
+        try {
+          // Try to process with retries
+          let result: R | null = null;
+          let retries = 0;
+          
+          while (retries <= maxRetries) {
+            try {
+              result = await processItem(item, index);
+              break; // Success, exit retry loop
+            } catch (error: any) {
+              retries++;
+              
+              // If rate limited, wait longer
+              const isRateLimit = error.status === 403 && 
+                (error.message?.includes('rate limit') || error.message?.includes('API rate'));
+              
+              if (isRateLimit && retries <= maxRetries) {
+                console.warn(`Rate limit hit, waiting ${retryDelayMs * retries}ms before retry ${retries}/${maxRetries}`);
+                await delay(retryDelayMs * retries); // Exponential backoff
+              } else if (retries <= maxRetries) {
+                // For other errors, try again with standard delay
+                console.error(`Error processing item (attempt ${retries}):`, error);
+                await delay(retryDelayMs);
+              } else {
+                // Max retries reached, give up
+                console.error(`Failed after ${maxRetries} retries:`, error);
+                result = null as unknown as R;
+              }
+            }
+          }
+          
+          completedCount++;
+          if (result !== null) {
+            batchResults.push(result);
+          }
+          
+          // Update progress if callback provided
+          if (updateProgress) {
+            const itemName = typeof item === 'object' && item !== null && 'name' in item 
+              ? String(item.name) 
+              : `Item ${index}`;
+            updateProgress(completedCount, total, itemName);
+          }
+        } finally {
+          inProgress.delete(index);
+        }
+      };
+      
+      // Start initial batch of concurrent tasks
+      const promisePool: Promise<void>[] = [];
+      for (let j = 0; j < Math.min(concurrency, batch.length); j++) {
+        promisePool.push(processNext());
+      }
+      
+      // As tasks complete, start new ones to maintain concurrency
+      while (promisePool.length > 0) {
+        await Promise.race(promisePool);
+        
+        // Remove fulfilled promises - simplified approach to avoid potential infinite loops
+        const activePromises: Promise<void>[] = [];
+        for (let i = 0; i < promisePool.length; i++) {
+          const promise = promisePool[i];
+          // Create a race to see if this promise is pending
+          const isResolved = await Promise.race([
+            promise.then(() => true).catch(() => true),
+            new Promise(r => setTimeout(() => r(false), 10))
+          ]);
+          
+          // If not resolved yet, keep it in the active pool
+          if (isResolved === false) {
+            activePromises.push(promise);
+          }
+        }
+        
+        // Replace the pool with active promises
+        promisePool.length = 0;
+        promisePool.push(...activePromises);
+        
+        // Fill the pool back up with new tasks
+        while (promisePool.length < concurrency && queue.length > 0) {
+          promisePool.push(processNext());
+        }
+        
+        // Safety check - if no more items in queue and all promises are stuck, break out
+        if (queue.length === 0 && promisePool.length > 0 && promisePool.length === activePromises.length) {
+          // Wait a bit and check one more time
+          await delay(1000);
+          if (activePromises.length === promisePool.length) {
+            console.warn(`Breaking out of potentially stalled promise pool with ${promisePool.length} items still pending`);
+            break;
+          }
+        }
+      }
+    };
+    
+    // Process this batch
+    await processBatch();
+    results.push(...batchResults);
+    
+    // Add a short delay between batches to avoid overwhelming the API
+    if (i + batchSize < total) {
+      await delay(500);
     }
   }
-
+  
   return results.filter(result => result !== null);
 }
 
@@ -507,6 +622,11 @@ async function processRepositoriesInParallel(
     return dateB.getTime() - dateA.getTime();
   });
   
+  // Define dateQuery based on timeRange
+  const dateQuery = timeRange !== 'all' 
+    ? ` author-date:${formatDateForGitHub(startDate)}..${formatDateForGitHub(endDate)}`
+    : '';
+  
   // Take the most recent 75 repos to analyze
   const reposToProcess = repos.slice(0, 75);
   let processedCount = 0;
@@ -612,6 +732,11 @@ async function getRepositoryCommits(
       try {
         console.log(`Processing repo: ${repo.full_name}, Private: ${repo.private}`);
         
+        // Define dateQuery for search queries if needed
+        const dateQuery = timeRange !== 'all' 
+          ? ` author-date:${formatDateForGitHub(startDate)}..${formatDateForGitHub(endDate)}`
+          : '';
+          
         // Apply time range to commit query if specified
         const commitQueryParams: any = {
           owner: repo.owner.login,
@@ -888,7 +1013,7 @@ async function discoverUserRepositories(
       });
       
       console.log(`Found ${userRepos.length} repositories for user ${githubUsername}`);
-    } catch (error) {
+      } catch (error) {
       console.error(`Error fetching user repositories for ${githubUsername}:`, error);
     }
     
@@ -995,7 +1120,14 @@ async function discoverUserRepositories(
         }
       `;
       
-      const result: any = await octokit.graphql(query, { username: githubUsername });
+      // Add timeout to prevent hanging on GraphQL queries
+      const graphqlPromise = octokit.graphql(query, { username: githubUsername });
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("GraphQL query timeout")), 30000); // 30 second timeout
+      });
+      
+      // Use race to implement timeout
+      const result: any = await Promise.race([graphqlPromise, timeoutPromise]);
       
       if (result && result.user && result.user.contributionsCollection) {
         const { commitContributionsByRepository, pullRequestContributionsByRepository, issueContributionsByRepository } = 
@@ -1134,7 +1266,7 @@ async function calculateCodingStreak(
   startDate?: Date // Optional: if we want to limit the calculation range
 ): Promise<StreakData> {
   const activeDays = new Map<string, number>();
-  const now = new Date();
+    const now = new Date();
   let startDateToUse = startDate;
   
   if (!startDateToUse) {
@@ -1314,7 +1446,7 @@ async function calculateCodeImpact(
                   owner: repoOwner,
                   repo: repoName,
                   author: githubUsername,
-                  per_page: 100,
+            per_page: 100,
                   page: page,
                   headers
                 })
@@ -1435,261 +1567,355 @@ export async function getGitHubUserStats(
   try {
     if (updateProgress) updateProgress('initializing', 0, 100, 'Setting up GitHub client and validating user credentials');
     
-    // Get Octokit instance with user's token if userId is provided
-    const octokit = await getOctokit(userId);
+    const startTime = Date.now();
+    console.log(`Starting GitHub data collection for ${githubUsername} at ${new Date().toISOString()}`);
     
-    // Find user by GitHub username
-    const user = await withRateLimit(() => 
-      octokit.users.getByUsername({
-        username: githubUsername,
-        headers
-      })
-    );
-    
-    if (!user || !user.data) {
-      throw new Error("GitHub user not found");
-    }
-
-    // Get date range based on time range
-    const { startDate, endDate } = getDateRangeFromTimeRange(timeRange);
-    
-    if (updateProgress) updateProgress('discovering-repos', 0, 100, 'Finding all repositories you have access to');
-
-    // Get all organizations the user belongs to
-    const allOrgs = await getAllUserOrganizations(octokit, githubUsername);
-    console.log(`Found ${allOrgs.length} total organizations for user ${githubUsername}`);
-    
-    if (updateProgress) updateProgress('discovering-repos', 20, 100, `Found ${allOrgs.length} organizations you belong to`);
-
-    // Use the enhanced repository discovery function to find all repositories the user has contributed to
-    const repos = await discoverUserRepositories(octokit, githubUsername, allOrgs);
-    
-    if (updateProgress) updateProgress('discovering-repos', 70, 100, `Found ${repos.length} total repositories including organization repositories`);
-
-    console.log(`Found ${repos.length} repositories for ${githubUsername}, including private: ${repos.some(r => r.private)}, org repos: ${repos.filter(r => r.owner.type === "Organization").length}`);
-
-    // Count public vs private repos
-    const publicRepos = repos.filter(repo => !repo.private).length;
-    const privateRepos = repos.filter(repo => repo.private).length;
-
-    // Calculate total commits (aggregated from all repos)
-    let totalCommits = 0;
-    let totalLinesChanged = 0;
-    let contributions = 0;
-
-    // Limiting to 75 most recently updated repos for performance
-    // Sorting repos by last updated time
-    repos.sort((a, b) => {
-      const dateA = new Date(a.updated_at || "2000-01-01");
-      const dateB = new Date(b.updated_at || "2000-01-01");
-      return dateB.getTime() - dateA.getTime();
+    // Set a global timeout for the entire operation
+    const maxExecutionTime = 180000; // 3 minutes max
+    const timeoutPromise = new Promise<GitHubUserData>((_, reject) => {
+      setTimeout(() => {
+        console.error(`GitHub data collection for ${githubUsername} timed out after ${maxExecutionTime/1000}s`);
+        reject(new Error(`GitHub data collection timed out after ${maxExecutionTime/1000}s`));
+      }, maxExecutionTime);
     });
     
-    // The rest of the function remains the same...
+    // Create the actual data collection promise
+    const dataCollectionPromise = (async () => {
+      // Get Octokit instance with user's token if userId is provided
+      const octokit = await getOctokit(userId);
+      
+      // Find user by GitHub username
+      const user = await withRateLimit(() => 
+        octokit.users.getByUsername({
+          username: githubUsername,
+          headers
+        })
+      );
+      
+      if (!user || !user.data) {
+        throw new Error("GitHub user not found");
+      }
 
-    // Process repos in parallel for better performance
-    const processedRepoData = await processRepositoriesInParallel(
-      octokit,
-      repos,
-      githubUsername,
-      timeRange,
-      startDate,
-      endDate,
-      updateProgress
-    );
-    
-    // Sum up the results
-    totalCommits = processedRepoData.totalCommits;
-    totalLinesChanged = processedRepoData.totalLinesChanged;
-    contributions = processedRepoData.contributions;
+      // Get date range based on time range
+      const { startDate, endDate } = getDateRangeFromTimeRange(timeRange);
+      
+      if (updateProgress) updateProgress('discovering-repos', 0, 100, 'Finding all repositories you have access to');
 
-    // Process PRs and reviews in parallel
-    if (updateProgress) updateProgress(
-      'processing-prs', 
-      0, 
-      repos.length, 
-      `Analyzing pull requests and code reviews across repositories`
-    );
+      // Get all organizations the user belongs to
+      const allOrgs = await getAllUserOrganizations(octokit, githubUsername);
+      console.log(`Found ${allOrgs.length} total organizations for user ${githubUsername}`);
+      
+      if (updateProgress) updateProgress('discovering-repos', 20, 100, `Found ${allOrgs.length} organizations you belong to. Discovering repositories...`);
 
-    const processedPRData = await processInParallel(
-      repos,
-      async (repo) => {
-        try {
-          // Get ALL PRs created by user with pagination
-          let allPRs: any[] = [];
-          let prPage = 1;
-          let hasMorePRPages = true;
-          
-          // Paginate to get ALL PRs, limited to 2 pages per repo
-          while (hasMorePRPages && prPage <= 2) {
-            const prQueryParams: any = {
-              owner: repo.owner.login,
-              repo: repo.name,
-              state: "all",
-              per_page: 100,
-              page: prPage,
-              headers
-            };
+      // Use the enhanced repository discovery function to find all repositories the user has contributed to
+      const repos = await discoverUserRepositories(octokit, githubUsername, allOrgs);
+      
+      if (updateProgress) updateProgress('discovering-repos', 70, 100, `Found ${repos.length} total repositories. Processing data...`);
+
+      console.log(`Found ${repos.length} repositories for ${githubUsername}, including private: ${repos.some(r => r.private)}, org repos: ${repos.filter(r => r.owner.type === "Organization").length}`);
+
+      // Count public vs private repos
+      const publicRepos = repos.filter(repo => !repo.private).length;
+      const privateRepos = repos.filter(repo => repo.private).length;
+
+      // Calculate total commits (aggregated from all repos)
+      let totalCommits = 0;
+      let totalLinesChanged = 0;
+      let contributions = 0;
+
+      // Limiting to 100 most recently updated repos for performance
+      // Sorting repos by last updated time
+      repos.sort((a, b) => {
+        const dateA = new Date(a.updated_at || a.pushed_at || "2000-01-01");
+        const dateB = new Date(b.updated_at || b.pushed_at || "2000-01-01");
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      // Take the top 100 repositories by recency
+      const reposToProcess = repos.slice(0, 100);
+      
+      if (updateProgress) {
+        updateProgress(
+          'processing-repos', 
+          0, 
+          reposToProcess.length, 
+          `Processing ${reposToProcess.length} repositories in parallel`,
+          `Processing multiple repositories`
+        );
+      }
+
+      // Track processed repositories for progress reporting
+      let processedRepos = 0;
+      const repoDataByFullName = new Map();
+      
+      // Process repositories in parallel with enhanced progress reporting
+      const repoResults = await processInParallelWithProgress(
+        reposToProcess,
+        async (repo) => {
+          try {
+            const fullName = repo.full_name;
+            console.log(`Processing repository: ${fullName}`);
+            
+            // Get commits for this repository
+            let commits = [];
+            let commitCount = 0;
+            let linesChanged = 0;
             
             try {
-              const { data: pullRequestsPage } = await octokit.pulls.list(prQueryParams);
-              allPRs = [...allPRs, ...pullRequestsPage];
+              // Apply time range to commit query if specified
+              const commitQueryParams: any = {
+                owner: repo.owner.login,
+                repo: repo.name,
+                author: githubUsername,
+                per_page: 100,
+                headers
+              };
               
-              // Check if we need to fetch more pages
-              if (pullRequestsPage.length < 100) {
-                hasMorePRPages = false;
-              } else {
-                prPage++;
+              if (timeRange !== 'all') {
+                commitQueryParams.since = startDate.toISOString();
+                commitQueryParams.until = endDate.toISOString();
               }
-            } catch (prPageError) {
-              console.error(`Error fetching PR page ${prPage} for ${repo.name}:`, prPageError);
-              hasMorePRPages = false;
-            }
-          }
-          
-          const filteredPRs = allPRs.filter(pr => {
-            if (!pr.user || pr.user.login.toLowerCase() !== githubUsername.toLowerCase()) {
-              return false;
-            }
-            
-            if (timeRange !== 'all') {
-              const prDate = new Date(pr.created_at);
-              return prDate >= startDate && prDate <= endDate;
-            }
-            
-            return true;
-          });
-          
-          console.log(`Found ${filteredPRs.length} PRs by user in ${repo.name}`);
-          
-          // Get PR reviews from a sample of PRs
-          let userReviewCount = 0;
-          
-          // Get all PRs in the repo to check for reviews - limited to 30 recent PRs
-          const { data: repoPRs } = await octokit.pulls.list({
-            owner: repo.owner.login,
-            repo: repo.name,
-            state: "all",
-            per_page: 30,
-            headers
-          });
-          
-          // Process reviews in parallel
-          const reviewPromises = repoPRs.map(pr => 
-            octokit.pulls.listReviews({
-              owner: repo.owner.login,
-              repo: repo.name,
-              pull_number: pr.number,
-              headers
-            }).then(response => {
-              const userReviews = response.data.filter(review => 
-                review.user && review.user.login.toLowerCase() === githubUsername.toLowerCase()
+              
+              // Get first page of commits
+              const response = await withRateLimit(() => 
+                octokit.repos.listCommits(commitQueryParams)
               );
               
-              // Filter reviews by time range if needed
-              return userReviews.filter(review => {
-                if (timeRange !== 'all' && review.submitted_at) {
-                  const reviewDate = new Date(review.submitted_at);
-                  return reviewDate >= startDate && reviewDate <= endDate;
+              commits = response.data;
+              commitCount = commits.length;
+              
+              // If we have commits, sample a few to get line change stats
+              if (commits.length > 0) {
+                const sampleSize = Math.min(5, commits.length);
+                const sampleCommits = commits.slice(0, sampleSize);
+                
+                // Get detailed stats for sampled commits
+                for (const commit of sampleCommits) {
+                  try {
+                    const commitDetail = await withRateLimit(() => 
+                      octokit.repos.getCommit({
+                        owner: repo.owner.login,
+                        repo: repo.name,
+                        ref: commit.sha,
+                        headers
+                      })
+                    );
+                    
+                    if (commitDetail.data.stats) {
+                      linesChanged += (commitDetail.data.stats.additions || 0) + 
+                                      (commitDetail.data.stats.deletions || 0);
+                    }
+          } catch (error) {
+                    console.error(`Error getting commit details for ${commit.sha}:`, error);
+                  }
                 }
-                return true;
-              });
-            }).catch(error => {
-              console.log(`Error fetching reviews for PR #${pr.number} in ${repo.name}`);
-              return [];
-            })
-          );
-          
-          const allReviews = await Promise.all(reviewPromises);
-          userReviewCount = allReviews.reduce((acc, reviews) => acc + reviews.length, 0);
-          
-          console.log(`Found ${userReviewCount} reviews by user in ${repo.name}`);
-          
-          return {
-            repoName: repo.name,
-            pullRequests: filteredPRs.length,
-            openPRs: filteredPRs.filter(pr => pr.state === "open").length,
-            mergedPRs: filteredPRs.filter(pr => pr.merged_at !== null).length,
-            reviews: userReviewCount
-          };
-        } catch (error) {
-          console.error(`Error processing PRs for ${repo.name}:`, error);
-          return {
-            repoName: repo.name,
-            pullRequests: 0,
-            openPRs: 0,
-            mergedPRs: 0,
-            reviews: 0
-          };
+                
+                // Extrapolate to estimate total lines changed
+                if (sampleSize > 0) {
+                  linesChanged = Math.round((linesChanged / sampleSize) * commitCount);
+                }
+              }
+            } catch (error) {
+              console.error(`Error fetching commits for ${fullName}:`, error);
+            }
+            
+            // Get PRs and reviews
+            let prs = [];
+            let prCount = 0;
+            let openPRs = 0;
+            let mergedPRs = 0;
+            let reviewCount = 0;
+            
+            try {
+              // Get PRs created by user
+              const prResponse = await withRateLimit(() => 
+                octokit.pulls.list({
+                  owner: repo.owner.login,
+                  repo: repo.name,
+                  state: "all",
+                  per_page: 100,
+                  headers
+                })
+              );
+              
+              prs = prResponse.data.filter(pr => 
+                pr.user && pr.user.login.toLowerCase() === githubUsername.toLowerCase() &&
+                (timeRange === 'all' || 
+                  (new Date(pr.created_at) >= startDate && new Date(pr.created_at) <= endDate))
+              );
+              
+              prCount = prs.length;
+              openPRs = prs.filter(pr => pr.state === "open").length;
+              mergedPRs = prs.filter(pr => pr.merged_at !== null).length;
+              
+              // Get a sample of all PRs to check reviews
+              const allPRsResponse = await withRateLimit(() => 
+                octokit.pulls.list({
+                  owner: repo.owner.login,
+                  repo: repo.name,
+                  state: "all",
+                  per_page: 20,
+                  headers
+                })
+              );
+              
+              // Check for reviews by user
+              for (const pr of allPRsResponse.data.slice(0, 5)) { // Limit to 5 PRs for performance
+                try {
+                  const reviewsResponse = await withRateLimit(() => 
+                    octokit.pulls.listReviews({
+                      owner: repo.owner.login,
+                      repo: repo.name,
+                      pull_number: pr.number,
+                      headers
+                    })
+                  );
+                  
+                  const userReviews = reviewsResponse.data.filter(review => 
+                    review.user && review.user.login.toLowerCase() === githubUsername.toLowerCase() &&
+                    (timeRange === 'all' || 
+                      (review.submitted_at && new Date(review.submitted_at) >= startDate && 
+                       new Date(review.submitted_at) <= endDate))
+                  );
+                  
+                  reviewCount += userReviews.length;
+                } catch (error) {
+                  console.error(`Error fetching reviews for PR #${pr.number}:`, error);
+                }
+              }
+            } catch (error) {
+              console.error(`Error fetching PRs for ${fullName}:`, error);
+            }
+            
+            // Store data for this repo
+            const repoData = {
+              fullName,
+              commitCount,
+              linesChanged,
+              prCount,
+              openPRs,
+              mergedPRs,
+              reviewCount,
+              isOrg: repo.owner.type === "Organization",
+              orgName: repo.owner.type === "Organization" ? repo.owner.login : null
+            };
+            
+            repoDataByFullName.set(fullName, repoData);
+            
+            processedRepos++;
+            if (updateProgress) {
+              updateProgress(
+                'processing-repos', 
+                processedRepos, 
+                reposToProcess.length, 
+                `Processed ${processedRepos}/${reposToProcess.length} repositories`,
+                repo.owner.type === "Organization" ? repo.owner.login : undefined
+              );
+            }
+            
+            return repoData;
+          } catch (error) {
+            console.error(`Error processing repository ${repo.full_name}:`, error);
+            processedRepos++;
+            return null;
+          }
+        },
+        {
+          concurrency: 10, // Process 10 repos at a time
+          batchSize: 20,   // Process in batches of 20
+          updateProgress: (completed, total, repoName) => {
+            if (updateProgress) {
+              const percentage = Math.floor((completed / total) * 100);
+              updateProgress(
+                'processing-repos', 
+                completed, 
+                total, 
+                `Processed ${completed}/${total} repositories${repoName ? ` - ${repoName}` : ''}`,
+                repoName
+              );
+            }
+          }
         }
-      },
-      10, // Process 10 repos concurrently
-      (completed, total) => {
-        if (updateProgress) {
-          updateProgress(
-            'processing-prs', 
-            completed, 
-            total, 
-            `Processed ${completed} of ${total} repositories`
-          );
+      );
+
+      // Calculate totals from processed repositories
+      for (const repoData of repoResults) {
+        if (repoData) {
+          totalCommits += repoData.commitCount;
+          totalLinesChanged += repoData.linesChanged;
+          contributions += repoData.commitCount + repoData.prCount + repoData.reviewCount;
         }
       }
-    );
 
-    // Sum up PR and review results
-    let totalPRs = 0;
-    let openPRs = 0;
-    let mergedPRs = 0;
-    let reviews = 0;
-    
-    for (const data of processedPRData) {
-      totalPRs += data.pullRequests;
-      openPRs += data.openPRs;
-      mergedPRs += data.mergedPRs;
-      reviews += data.reviews;
-      contributions += data.pullRequests + data.reviews;
-    }
+      // Calculate totals for PRs and reviews
+      let totalPRs = 0;
+      let openPRCount = 0;
+      let mergedPRCount = 0;
+      let reviewsCount = 0;
+      
+      repoResults.forEach(repo => {
+        if (repo) {
+          totalPRs += repo.prCount;
+          openPRCount += repo.openPRs;
+          mergedPRCount += repo.mergedPRs;
+          reviewsCount += repo.reviewCount;
+          contributions += repo.prCount + repo.reviewCount;
+        }
+      });
 
-    // Calculate stars received (stars don't change based on time range)
-    const totalStars = repos.reduce((acc, repo) => acc + (repo.stargazers_count || 0), 0);
+      // Calculate stars received (stars don't change based on time range)
+      const totalStars = repos.reduce((acc, repo) => acc + (repo.stargazers_count || 0), 0);
+
+      if (updateProgress) updateProgress('calculating-streak', 0, 100, 'Analyzing your coding streak patterns');
+      
+      // Calculate coding streak data
+      const streakData = await calculateCodingStreak(octokit, githubUsername);
+      
+      if (updateProgress) updateProgress('calculating-streak', 100, 100, 'Streak analysis complete');
+      
+      if (updateProgress) updateProgress('calculating-impact', 0, 100, 'Measuring your code impact across repositories');
+      
+      // Use our existing calculations instead of recalculating
+      const impactData = {
+        totalLinesChanged,
+        totalRepositories: reposToProcess.length,
+        detailedImpact: new Map()
+      };
+      
+      if (updateProgress) updateProgress('calculating-impact', 100, 100, 'Code impact analysis complete');
+      
+      // Record end time and calculate duration
+      const endTime = Date.now();
+      const duration = (endTime - startTime) / 1000;
+      console.log(`GitHub data collection for ${githubUsername} completed in ${duration}s`);
+      
+      // Integrate new data with existing stats
+      if (updateProgress) updateProgress('finalizing', 100, 100, `Analysis complete! Processed ${reposToProcess.length} repositories in ${duration.toFixed(1)}s`);
+
+      return {
+        commits: totalCommits,
+        pullRequests: totalPRs,
+        mergedPullRequests: mergedPRCount,
+        openPullRequests: openPRCount,
+        stars: totalStars,
+        repos: repos.length,
+        streak: streakData.currentStreak, // Use current streak as the main streak value
+        totalLinesChanged: impactData.totalLinesChanged,
+        lastActivity: streakData.lastActiveDate || undefined, // Convert null to undefined to satisfy type
+        timeRange,
+        contributions,
+        reviews: reviewsCount,
+        privateRepos: privateRepos,
+        publicRepos: publicRepos,
+        currentStreak: streakData.currentStreak,
+        longestStreak: streakData.longestStreak,
+        activeDays: streakData.activeDays.size,
+        totalRepositoriesImpacted: impactData.totalRepositories
+      };
+    })();
     
-    if (updateProgress) updateProgress('calculating-streak', 0, 100, 'Analyzing your coding streak patterns');
-    
-    // Calculate coding streak data
-    const streakData = await calculateCodingStreak(octokit, githubUsername);
-    
-    if (updateProgress) updateProgress('calculating-streak', 100, 100, 'Streak analysis complete');
-    
-    if (updateProgress) updateProgress('calculating-impact', 0, 100, 'Measuring your code impact across repositories');
-    
-    // Calculate code impact more accurately
-    const impactData = await calculateCodeImpact(octokit, githubUsername, repos);
-    
-    if (updateProgress) updateProgress('calculating-impact', 100, 100, 'Code impact analysis complete');
-    
-    // Integrate new data with existing stats
-    if (updateProgress) updateProgress('finalizing', 100, 100, 'Analysis complete!');
-    
-    return {
-      commits: totalCommits,
-      pullRequests: totalPRs,
-      mergedPullRequests: mergedPRs,
-      openPullRequests: openPRs,
-      stars: totalStars,
-      repos: repos.length,
-      streak: streakData.currentStreak, // Use current streak as the main streak value
-      totalLinesChanged: impactData.totalLinesChanged,
-      lastActivity: streakData.lastActiveDate || undefined, // Convert null to undefined to satisfy type
-      timeRange,
-      contributions,
-      reviews,
-      privateRepos: privateRepos,
-      publicRepos: publicRepos,
-      currentStreak: streakData.currentStreak,
-      longestStreak: streakData.longestStreak,
-      activeDays: streakData.activeDays.size,
-      totalRepositoriesImpacted: impactData.totalRepositories
-    };
+    // Race between the data collection and timeout
+    return await Promise.race([dataCollectionPromise, timeoutPromise]);
   } catch (error) {
     console.error("Error fetching GitHub user stats:", error);
     // Return default values if error occurs

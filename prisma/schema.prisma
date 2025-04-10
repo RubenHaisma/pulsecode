@@ -51,6 +51,8 @@ model User {
   points        Int           @default(0)
   accounts      Account[]
   sessions      Session[]
+  repositories  GitHubRepository[]
+  activities    GitHubActivity[]
 }
 
 model VerificationToken {
@@ -76,6 +78,12 @@ model Stats {
   reviews       Int       @default(0)
   privateRepos  Int       @default(0)
   publicRepos   Int       @default(0)
+  currentStreak Int       @default(0)
+  longestStreak Int       @default(0)
+  activeDays    Int       @default(0)
+  totalRepositoriesImpacted Int @default(0)
+  stars         Int       @default(0)
+  lastRefreshed DateTime  @default(now())
 }
 
 model Achievement {
@@ -87,4 +95,44 @@ model Achievement {
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   unlockedAt  DateTime  @default(now())
+}
+
+// Repository data for each user
+model GitHubRepository {
+  id          String   @id @default(uuid())
+  userId      String
+  repoId      Int      // GitHub's repository ID
+  name        String
+  fullName    String
+  owner       String
+  isPrivate   Boolean  @default(false)
+  ownerType   String   // User or Organization
+  url         String
+  stars       Int      @default(0)
+  commitCount Int      @default(0)
+  prCount     Int      @default(0)
+  reviewCount Int      @default(0)
+  linesChanged Int     @default(0)
+  lastUpdated DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, repoId])
+}
+
+// Store activity data
+model GitHubActivity {
+  id          String   @id @default(uuid())
+  userId      String
+  type        String   // commit, pr, review
+  title       String
+  repo        String
+  url         String
+  date        DateTime
+  sha         String?  // For commits
+  prNumber    Int?     // For PRs or reviews
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, date])
 }

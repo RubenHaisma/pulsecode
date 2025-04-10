@@ -141,6 +141,45 @@ const ACHIEVEMENT_DATA: Record<string, AchievementData> = {
   },
 };
 
+// Profile orb that uses the user's avatar
+const ProfileOrb = () => {
+  const { data: session } = useSession();
+  
+  const getInitials = (name: string | null | undefined): string => 
+    name?.split(' ').map(n => n[0]).join('') || 'U';
+  
+  return (
+    <div className="w-48 h-48 flex items-center justify-center">
+      <div className="rounded-full w-32 h-32 bg-gradient-to-br from-pink-500 to-purple-700 animate-pulse p-1">
+        <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          {session?.user?.image ? (
+            <img src={session.user.image} alt="Profile" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-white text-2xl font-bold">{getInitials(session?.user?.name)}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// User avatar with consistent fallback
+const CodeAvatar = ({ user }: { user: any }) => {
+  const getInitials = (name: string | null | undefined): string => 
+    name?.split(' ').map(n => n[0]).join('') || 'U';
+    
+  return (
+    <Avatar>
+      <AvatarImage src={user?.image || undefined} />
+      <AvatarFallback>
+        <div className="bg-gradient-to-br from-pink-500 to-purple-700 w-full h-full flex items-center justify-center">
+          {getInitials(user?.name)}
+        </div>
+      </AvatarFallback>
+    </Avatar>
+  );
+};
+
 // Simple orb placeholder in case the 3D component fails
 const SimpleOrb = () => (
   <div className="w-48 h-48 flex items-center justify-center">
@@ -152,7 +191,7 @@ const SimpleOrb = () => (
 
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
   return (
-    <ReactErrorBoundary fallback={<SimpleOrb />}>
+    <ReactErrorBoundary fallback={<ProfileOrb />}>
       {children}
     </ReactErrorBoundary>
   );
@@ -183,7 +222,13 @@ export default function DashboardPage() {
   const [activities, setActivities] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingPhase, setLoadingPhase] = useState<string>("Initializing")
-  const [loadingProgress, setLoadingProgress] = useState<{ stage: string; completed: number; total: number }>({ 
+  const [loadingProgress, setLoadingProgress] = useState<{ 
+    stage: string; 
+    completed: number; 
+    total: number; 
+    details?: string;
+    orgName?: string;
+  }>({ 
     stage: 'initializing', 
     completed: 0, 
     total: 100 
@@ -194,6 +239,7 @@ export default function DashboardPage() {
   const [timeRange, setTimeRange] = useState<string>("all")
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  const [dataLastUpdated, setDataLastUpdated] = useState<number | null>(null)
   const router = useRouter()
   const { toast } = useToast()
   
@@ -203,6 +249,131 @@ export default function DashboardPage() {
       router.push("/login")
     }
   }, [status, router])
+
+  // Add a function to check if GitHub is properly connected
+  const checkGitHubConnection = async () => {
+    try {
+      const response = await fetch("/api/user/profile");
+      const userData = await response.json();
+      
+      // Use githubUsername if available, otherwise use githubId
+      if (userData.githubUsername) {
+        setGithubUsername(userData.githubUsername);
+        return true;
+      } else if (userData.githubId) {
+        setGithubUsername(userData.githubId);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error checking GitHub connection:", error);
+      return false;
+    }
+  };
+
+  // Check if data is stale (older than 15 minutes)
+  const isDataStale = () => {
+    if (!dataLastUpdated) return true;
+    
+    const fifteenMinutes = 15 * 60 * 1000; // 15 minutes in milliseconds
+    return Date.now() - dataLastUpdated > fifteenMinutes;
+  };
+  
+  // Initialize user profile and fetch data
+  const initializeProfile = async (hasCache: boolean = false) => {
+    try {
+      if (!hasCache) {
+        setLoading(true);
+      }
+      
+      setLoadingPhase("Initializing profile");
+      
+      // Initialize profile
+      await fetch("/api/auth/create-profile", {
+        method: "POST",
+      }).then((res) => {
+        if (!res.ok) {
+          console.error("Failed to initialize profile");
+        }
+      });
+      
+      // First check GitHub connection
+      setLoadingPhase("Checking GitHub connection");
+      const profileConnected = await checkGitHubConnection();
+      
+      // Initial data fetch with default time range
+      if (profileConnected) {
+        // Only fetch if data is stale or we don't have any data
+        if (isDataStale() || !dataLastUpdated) {
+          setLoadingPhase("Fetching your coding stats");
+          await fetchGitHubData(timeRange, false); // No need to force refresh on every load
+        } else if (!hasCache) {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+        if (!githubUsername) {
+          // Show GitHub connect dialog if not connected
+          setIsConnecting(true);
+        }
+      }
+    } catch (err) {
+      console.error("Error initializing profile:", err);
+      setLoading(false);
+    }
+  };
+  
+  // Load cached data from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined' && status === "authenticated") {
+      try {
+        // Load time range preference
+        const savedTimeRange = localStorage.getItem('pulsecode_timeRange');
+        if (savedTimeRange) {
+          setTimeRange(savedTimeRange);
+        }
+        
+        // Load cached data
+        const cachedData = localStorage.getItem('pulsecode_githubData');
+        if (cachedData) {
+          const parsedData = JSON.parse(cachedData);
+          
+          // Check if we have valid cached data with a timestamp
+          if (parsedData.stats && parsedData.achievements && 
+              parsedData.activities && parsedData.timestamp) {
+            
+            // Check if data is stale
+            const fifteenMinutes = 15 * 60 * 1000;
+            const isStale = Date.now() - parsedData.timestamp > fifteenMinutes;
+            
+            // Set the cached data
+            setStats(parsedData.stats);
+            setAchievements(parsedData.achievements);
+            setActivities(parsedData.activities);
+            setDataLastUpdated(parsedData.timestamp);
+            
+            // Set loading to false since we have cached data
+            setLoading(false);
+            
+            // If data is stale, trigger a background refresh
+            if (isStale) {
+              initializeProfile(true);
+            }
+          } else {
+            // Data format is invalid, initialize profile
+            initializeProfile(false);
+          }
+        } else {
+          // No cached data, initialize profile
+          initializeProfile(false);
+        }
+      } catch (error) {
+        console.error("Error loading cached data:", error);
+        // If there's an error loading cached data, initialize profile
+        initializeProfile(false);
+      }
+    }
+  }, [status]);
 
   // Fetch GitHub stats based on time range
   const fetchGitHubData = async (selectedTimeRange: string, forceRefresh: boolean = false) => {
@@ -225,19 +396,22 @@ export default function DashboardPage() {
           // Update loading phase with more user-friendly messages
           switch (data.stage) {
             case 'discovering-repos':
-              setLoadingPhase(`Finding your repositories (${Math.round(data.completed/data.total*100)}%)`);
+              setLoadingPhase(`Finding repositories (${Math.round(data.completed/data.total*100)}%)`);
               break;
-            case 'processing-commits':
-              setLoadingPhase(`Analyzing commits (${Math.round(data.completed/data.total*100)}%)`);
+            case 'processing-repos':
+              setLoadingPhase(`Processing repositories (${Math.round(data.completed/data.total*100)}%)`);
               break;
-            case 'processing-prs':
-              setLoadingPhase(`Processing pull requests (${Math.round(data.completed/data.total*100)}%)`);
+            case 'calculating-streak':
+              setLoadingPhase(`Analyzing coding streak (${Math.round(data.completed/data.total*100)}%)`);
+              break;
+            case 'calculating-impact':
+              setLoadingPhase(`Measuring code impact (${Math.round(data.completed/data.total*100)}%)`);
               break;
             case 'finalizing':
-              setLoadingPhase(`Finalizing your stats (${Math.round(data.completed/data.total*100)}%)`);
+              setLoadingPhase(`Finalizing (${Math.round(data.completed/data.total*100)}%)`);
               break;
             default:
-              setLoadingPhase(`Processing your GitHub data (${Math.round(data.completed/data.total*100)}%)`);
+              setLoadingPhase(`Processing data (${Math.round(data.completed/data.total*100)}%)`);
           }
         }
       };
@@ -288,8 +462,6 @@ export default function DashboardPage() {
       if (statsData.achievements) {
         setAchievements(statsData.achievements);
       }
-
-      console.log("GitHub stats response:", statsData);
       
       // Update loading phase for activity fetching
       setLoadingPhase("Fetching your recent activity");
@@ -304,12 +476,45 @@ export default function DashboardPage() {
         setLoading(false);
         return false;
       }
-
-      console.log("GitHub activity response:", activityData);
       
       if (activityData.activities) {
         setActivities(activityData.activities);
       }
+      
+      // Save to localStorage
+      const timestamp = Date.now();
+      setDataLastUpdated(timestamp);
+      
+      try {
+        localStorage.setItem('pulsecode_timeRange', selectedTimeRange);
+        localStorage.setItem('pulsecode_githubData', JSON.stringify({
+          stats: {
+            commits: statsData.stats?.commits || 0,
+            pullRequests: statsData.stats?.pullRequests || 0,
+            streak: statsData.stats?.streak || 0,
+            points: statsData.stats?.points || 0,
+            level: statsData.stats?.level || 1,
+            totalLinesChanged: statsData.stats?.totalLinesChanged || 0,
+            stars: statsData.stats?.stars || 0,
+            repos: statsData.stats?.repos || 0,
+            timeRange: selectedTimeRange,
+            contributions: statsData.stats?.contributions || 0,
+            reviews: statsData.stats?.reviews || 0,
+            privateRepos: statsData.stats?.privateRepos || 0,
+            publicRepos: statsData.stats?.publicRepos || 0,
+            currentStreak: statsData.stats?.currentStreak || 0,
+            longestStreak: statsData.stats?.longestStreak || 0,
+            activeDays: statsData.stats?.activeDays || 0,
+            totalRepositoriesImpacted: statsData.stats?.totalRepositoriesImpacted || 0,
+          },
+          achievements: statsData.achievements || [],
+          activities: activityData.activities || [],
+          timestamp
+        }));
+      } catch (error) {
+        console.error("Error caching data:", error);
+      }
+      
       return true;
     } catch (error) {
       console.error("Error fetching GitHub data:", error);
@@ -323,53 +528,10 @@ export default function DashboardPage() {
   // Handle time range change
   const handleTimeRangeChange = (value: string) => {
     setTimeRange(value);
+    localStorage.setItem('pulsecode_timeRange', value);
     fetchGitHubData(value);
   };
   
-  // Fetch GitHub stats when the component mounts
-  useEffect(() => {
-    async function initializeProfile() {
-      try {
-        setLoading(true);
-        setLoadingPhase("Initializing profile");
-        
-        // Initialize profile
-        await fetch("/api/auth/create-profile", {
-          method: "POST",
-        }).then((res) => {
-          if (!res.ok) {
-            console.error("Failed to initialize profile");
-          }
-        });
-        
-        // First check GitHub connection
-        setLoadingPhase("Checking GitHub connection");
-        const profileConnected = await checkGitHubConnection();
-        
-        // Initial data fetch with default time range
-        if (profileConnected) {
-          setLoadingPhase("Fetching your coding stats");
-          // Fetch with force refresh
-          await fetchGitHubData(timeRange, true);
-        } else {
-          setLoading(false);
-          if (!githubUsername) {
-            // Show GitHub connect dialog if not connected
-            setIsConnecting(true);
-          }
-        }
-      } catch (err) {
-        console.error("Error initializing profile:", err);
-        setLoading(false);
-      }
-    }
-    
-    // Initialize user profile if logged in
-    if (status === "authenticated" && session?.user) {
-      initializeProfile();
-    }
-  }, [session, status]);
-
   const levelProgress = (stats.points % 100) / 100 * 100;
   
   const getInitials = (name: string | null | undefined): string => 
@@ -406,7 +568,15 @@ export default function DashboardPage() {
     
     try {
       // Re-fetch GitHub data
-      await fetchGitHubData(timeRange, true);
+      const success = await fetchGitHubData(timeRange, true);
+      
+      if (!success) {
+        toast({
+          title: "Error fetching data",
+          description: "There was an error fetching your GitHub data. Please try again.",
+          variant: "destructive",
+        });
+      }
     } catch (error: any) {
       console.error("Error fetching GitHub data after connection:", error);
       toast({
@@ -425,7 +595,7 @@ export default function DashboardPage() {
         <li><span className="font-medium">read:user, user:email</span> - To identify you and access your public profile</li>
         <li><span className="font-medium">repo</span> - To access all your repositories, including private ones (if any)</li>
         <li><span className="font-medium">read:org</span> - To discover repositories in organizations you contribute to</li>
-        <li><span className="font-medium">read:project</span> - To find all projects you've worked on</li>
+        <li><span className="font-medium">read:project</span> - To find all projects you&apos;ve worked on</li>
       </ul>
       <p className="mt-2 text-xs text-muted-foreground">
         We only use these permissions to calculate your coding stats. We never modify your repositories or make changes on your behalf.
@@ -439,91 +609,77 @@ export default function DashboardPage() {
     
     setIsRefreshing(true);
     try {
-      const response = await fetch("/api/github/stats", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ timeRange }),
+      toast({
+        title: "Refreshing data",
+        description: "Fetching your latest GitHub activity...",
       });
       
-      if (!response.ok) {
-        console.error("Failed to refresh stats");
-        return;
-      }
+      // Use force refresh to bypass caching
+      const success = await fetchGitHubData(timeRange, true);
       
-      // Fetch data with current time range after refreshing
-      await fetchGitHubData(timeRange);
+      if (success) {
+        toast({
+          title: "Data refreshed",
+          description: "Your GitHub data has been successfully updated.",
+        });
+      } else {
+        toast({
+          title: "Refresh failed",
+          description: "There was an error refreshing your GitHub data. Please try again.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error("Error refreshing stats:", error);
+      toast({
+        title: "Refresh failed",
+        description: "There was an error refreshing your GitHub data. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  // Add a function to check if GitHub is properly connected
-  const checkGitHubConnection = async () => {
-    try {
-      const response = await fetch("/api/user/profile");
-      const userData = await response.json();
-      
-      // Use githubUsername if available, otherwise use githubId
-      if (userData.githubUsername) {
-        setGithubUsername(userData.githubUsername);
-        return true;
-      } else if (userData.githubId) {
-        setGithubUsername(userData.githubId);
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Error checking GitHub connection:", error);
-      return false;
-    }
-  };
-
-  // Use effect to check GitHub connection on load
-  useEffect(() => {
-    if (status === "authenticated") {
-      checkGitHubConnection();
-    }
-  }, [status]);
-
   // Add a loading indicator component to show detailed loading progress
   const LoadingIndicator = () => {
-    // Calculate overall progress
-    let overallProgress = 0;
-    
-    if (loadingProgress.stage === 'discovering-repos') {
-      overallProgress = (loadingProgress.completed / loadingProgress.total) * 25;
-    } else if (loadingProgress.stage === 'processing-commits') {
-      overallProgress = 25 + (loadingProgress.completed / loadingProgress.total) * 40;
-    } else if (loadingProgress.stage === 'processing-prs') {
-      overallProgress = 65 + (loadingProgress.completed / loadingProgress.total) * 30;
-    } else if (loadingProgress.stage === 'finalizing') {
-      overallProgress = 95 + (loadingProgress.completed / loadingProgress.total) * 5;
-    }
-    
     return (
-      <div className="flex flex-col items-center justify-center h-[300px] w-full space-y-6">
-        <div className="space-y-2 text-center">
-          <Loader2 className="h-10 w-10 animate-spin mx-auto" />
-          <h3 className="text-xl font-semibold">{loadingPhase}</h3>
-          <p className="text-sm text-muted-foreground">
-            This might take a moment, but we&apos;ll get ALL your data!
+      <div className="flex flex-col items-center justify-center p-8 mt-8">
+        <div className="relative w-full max-w-md mb-8">
+          <Progress 
+            value={(loadingProgress.completed / loadingProgress.total) * 100} 
+            className="h-2 bg-gray-800"
+          />
+          <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+            <span>{Math.round((loadingProgress.completed / loadingProgress.total) * 100)}%</span>
+            <span>{loadingProgress.stage}</span>
+          </div>
+        </div>
+        
+        <Loader2 className="h-8 w-8 animate-spin mb-4" />
+        <h3 className="text-lg font-medium mb-2">{loadingPhase}</h3>
+        
+        {/* Show detailed progress information */}
+        {loadingProgress.details && (
+          <p className="text-center text-sm text-muted-foreground mb-4">
+            {loadingProgress.details}
           </p>
-        </div>
+        )}
         
-        <div className="w-full max-w-md">
-          <Progress value={Math.round(overallProgress)} className="h-2" />
-        </div>
+        {/* Current repository being processed */}
+        {loadingProgress.orgName && (
+          <div className="mt-2 bg-muted/20 p-3 rounded-md text-sm">
+            <span className="font-medium">Organization: </span>
+            {loadingProgress.orgName}
+          </div>
+        )}
         
-        <div className="text-xs text-muted-foreground">
-          {loadingProgress.stage === 'discovering-repos' && 'Finding all repositories including organizations'}
-          {loadingProgress.stage === 'processing-commits' && 'Analyzing your commit history and code changes'}
-          {loadingProgress.stage === 'processing-prs' && 'Collecting pull requests and code reviews'}
-          {loadingProgress.stage === 'finalizing' && 'Calculating statistics and achievements'}
-        </div>
+        {/* Show estimated time remaining if we're far enough in the process */}
+        {loadingProgress.completed > 10 && loadingProgress.total > 0 && (
+          <p className="text-xs text-muted-foreground mt-4">
+            Processing repositories in parallel for faster results
+          </p>
+        )}
       </div>
     );
   };
@@ -570,6 +726,7 @@ export default function DashboardPage() {
             <Button
               variant="ghost"
               className="w-full justify-start"
+              onClick={() => router.push("/dashboard/leaderboard")}
             >
               <Trophy className="mr-2 h-4 w-4" />
               Leaderboard
@@ -577,6 +734,7 @@ export default function DashboardPage() {
             <Button
               variant="ghost"
               className="w-full justify-start"
+              onClick={() => router.push("/dashboard/achievements")}
             >
               <Star className="mr-2 h-4 w-4" />
               Achievements
@@ -584,6 +742,7 @@ export default function DashboardPage() {
             <Button
               variant="ghost"
               className="w-full justify-start"
+              onClick={() => router.push("/dashboard/activity")}
             >
               <History className="mr-2 h-4 w-4" />
               Activity
@@ -591,6 +750,7 @@ export default function DashboardPage() {
             <Button
               variant="ghost"
               className="w-full justify-start"
+              onClick={() => router.push("/dashboard/settings")}
             >
               <Settings className="mr-2 h-4 w-4" />
               Settings
@@ -599,10 +759,7 @@ export default function DashboardPage() {
 
           <div className="mt-auto border-t border-white/10 pt-6">
             <div className="flex items-center gap-3 mb-4">
-              <Avatar>
-                <AvatarImage src={session?.user?.image || undefined} />
-                <AvatarFallback>{getInitials(session?.user?.name)}</AvatarFallback>
-              </Avatar>
+              <CodeAvatar user={session?.user} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{session?.user?.name}</p>
                 <p className="text-xs text-muted-foreground truncate">Level {stats.level}</p>
@@ -643,10 +800,6 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3">
                 <Dialog open={isConnecting} onOpenChange={closeGitHubConnect}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={connectGitHub}>
-                      <Github className="mr-2 h-4 w-4" />
-                      {githubUsername ? "Update GitHub" : "Connect GitHub"}
-                    </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
@@ -659,31 +812,64 @@ export default function DashboardPage() {
                     <GitHubPermissionsInfo />
                   </DialogContent>
                 </Dialog>
-                <Button variant="outline" size="sm">
-                  <Twitter className="mr-2 h-4 w-4" />
-                  Connect Twitter
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="bg-black/60 border-white/20 hover:bg-sky-900/30 transition-colors"
+                  onClick={() => {
+                    // Create tweet text with user stats
+                    const tweetText = `🚀 My coding stats on PulseCode:\n\n` +
+                      `Level ${stats.level} Coder\n` +
+                      `${stats.commits} Commits\n` +
+                      `${stats.pullRequests} Pull Requests\n` +
+                      `🔥 ${stats.currentStreak || stats.streak || 0} Day Streak\n\n` +
+                      `Track your GitHub stats with @PulseCodeApp #coding #github`;
+                    
+                    // URL encode the tweet text
+                    const encodedTweet = encodeURIComponent(tweetText);
+                    
+                    // Open Twitter/X with the pre-filled tweet
+                    window.open(`https://x.com/intent/tweet?text=${encodedTweet}`, '_blank');
+                  }}
+                >
+                  <Twitter className="mr-2 h-4 w-4 text-sky-400" />
+                  Share Stats
                 </Button>
               </div>
             </div>
 
             {/* Time range selector and refresh button */}
-            <div className="flex justify-end space-x-2">
-              <TimeRangeSelector 
-                value={timeRange} 
-                onChange={handleTimeRangeChange} 
-              />
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="bg-black/60 border-white/20" 
-                onClick={refreshStats}
-                disabled={isRefreshing}
-              >
-                <svg className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <span className="ml-2">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-              </Button>
+            <div className="flex justify-between items-center">
+              <div className="text-xs text-muted-foreground">
+                {dataLastUpdated ? (
+                  <>
+                    <span>Last updated: </span>
+                    {new Date(dataLastUpdated).toLocaleTimeString()} 
+                    {isDataStale() ? 
+                      <span className="ml-1 text-amber-400">(Outdated)</span> : 
+                      <span className="ml-1 text-green-400">(Up to date)</span>
+                    }
+                  </>
+                ) : 'No data loaded yet'}
+              </div>
+              <div className="flex space-x-2">
+                <TimeRangeSelector 
+                  value={timeRange} 
+                  onChange={handleTimeRangeChange} 
+                />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="bg-black/60 border-white/20" 
+                  onClick={refreshStats}
+                  disabled={isRefreshing}
+                >
+                  <svg className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span className="ml-2">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                </Button>
+              </div>
             </div>
 
             {/* Level progress */}
