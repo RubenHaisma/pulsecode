@@ -2174,8 +2174,7 @@ export async function updateGitHubUserData(
       select: {
         id: true,
         githubUsername: true,
-        githubId: true,
-        points: true
+        githubId: true
       }
     });
     
@@ -2198,13 +2197,10 @@ export async function updateGitHubUserData(
       enhancedProgressCallback
     );
     
-    // Always update the database, regardless of timeRange
+    // Always update the database regardless of time range
     if (enhancedProgressCallback) {
       enhancedProgressCallback('saving', 0, 100, 'Saving data to database');
     }
-
-    // Calculate level from points
-    const level = Math.floor((user.points || 0) / 100) + 1;
 
     // Update user stats in the database
     await prisma.stats.upsert({
@@ -2215,21 +2211,9 @@ export async function updateGitHubUserData(
         streak: githubData.streak,
         lastActivity: githubData.lastActivity,
         contributions: githubData.contributions || 0,
-        reviews: githubData.reviews || 0,
-        privateRepos: githubData.privateRepos || 0,
-        publicRepos: githubData.publicRepos || 0,
-        totalLinesChanged: githubData.totalLinesChanged || 0,
-        stars: githubData.stars || 0,
-        repos: githubData.repos || 0,
-        currentStreak: githubData.currentStreak || 0,
-        longestStreak: githubData.longestStreak || 0,
-        activeDays: githubData.activeDays || 0,
-        totalRepositoriesImpacted: githubData.totalRepositoriesImpacted || 0,
-        mergedPullRequests: githubData.mergedPullRequests || 0,
-        openPullRequests: githubData.openPullRequests || 0,
-        lastRefreshed: new Date(),
-        level: level,
-        points: user.points || 0,
+        reviews: githubData.reviews,
+        privateRepos: githubData.privateRepos,
+        publicRepos: githubData.publicRepos,
       },
       create: {
         userId,
@@ -2238,21 +2222,9 @@ export async function updateGitHubUserData(
         streak: githubData.streak,
         lastActivity: githubData.lastActivity,
         contributions: githubData.contributions || 0,
-        reviews: githubData.reviews || 0,
-        privateRepos: githubData.privateRepos || 0,
-        publicRepos: githubData.publicRepos || 0,
-        totalLinesChanged: githubData.totalLinesChanged || 0,
-        stars: githubData.stars || 0,
-        repos: githubData.repos || 0,
-        currentStreak: githubData.currentStreak || 0,
-        longestStreak: githubData.longestStreak || 0,
-        activeDays: githubData.activeDays || 0,
-        totalRepositoriesImpacted: githubData.totalRepositoriesImpacted || 0,
-        mergedPullRequests: githubData.mergedPullRequests || 0,
-        openPullRequests: githubData.openPullRequests || 0,
-        lastRefreshed: new Date(),
-        level: level,
-        points: user.points || 0,
+        reviews: githubData.reviews,
+        privateRepos: githubData.privateRepos,
+        publicRepos: githubData.publicRepos,
       },
     });
     

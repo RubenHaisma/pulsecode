@@ -71,7 +71,7 @@ export async function checkAndAwardAchievements(userId: string) {
     let githubData = null;
     
     if (user.githubId) {
-      githubData = await getGitHubUserStats(user.githubId);
+      githubData = await getGitHubUserStats(user.githubId, 'all', userId);
     }
 
     // Check for First Commit

@@ -1,29 +1,52 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { testGitHubToken, getOctokit } from "@/lib/github";
-import { Octokit } from "@octokit/rest";
+import { testGitHubToken, getOctokit, requiredGitHubScopes } from "@/lib/github";
+import prisma from "@/lib/prisma";
 
 export async function GET() {
   try {
-    // Only allow in development mode
-    if (process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ error: "Test endpoints not available in production" }, { status: 403 });
-    }
-
     const user = await getCurrentUser();
     if (!user || !user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Find the user's GitHub OAuth token and scopes from their account
+    const account = await prisma.account.findFirst({
+      where: {
+        userId: user.id,
+        provider: 'github'
+      },
+      select: {
+        access_token: true,
+        scope: true
+      }
+    });
+    
+    if (!account) {
+      return NextResponse.json({ 
+        error: "GitHub account not connected",
+        connected: false
+      }, { status: 200 });
+    }
+    
+    // Check the scopes
+    let missingScopes: string[] = [];
+    if (account.scope) {
+      const scopes = account.scope.split(' ');
+      missingScopes = requiredGitHubScopes.filter(scope => !scopes.includes(scope));
+    } else {
+      missingScopes = [...requiredGitHubScopes];
+    }
+    
     // Get an Octokit instance with the user's OAuth token
     const octokit = await getOctokit(user.id);
     
     // Test GitHub token
     const tokenTest = await testGitHubToken(octokit);
 
-    // Check additional permissions if token is valid
+    // Only include detailed token test in development
     let detailedPermissions = null;
-    if (tokenTest.valid) {
+    if (process.env.NODE_ENV !== 'production' && tokenTest.valid) {
       try {
         // Check rate limits
         const { data: rateLimits } = await octokit.rateLimit.get();
@@ -71,6 +94,8 @@ export async function GET() {
         detailedPermissions,
         source: "oauth_session"
       },
+      missingScopes,
+      needsReauth: missingScopes.length > 0,
       environment: {
         NODE_ENV: process.env.NODE_ENV
       }

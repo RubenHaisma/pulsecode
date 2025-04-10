@@ -84,11 +84,6 @@ model Stats {
   totalRepositoriesImpacted Int @default(0)
   stars         Int       @default(0)
   lastRefreshed DateTime  @default(now())
-  mergedPullRequests Int  @default(0)
-  openPullRequests   Int  @default(0)
-  level              Int  @default(1)
-  points             Int  @default(0)
-  repos              Int  @default(0)
 }
 
 model Achievement {

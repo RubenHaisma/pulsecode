@@ -46,47 +46,87 @@ export async function GET(req: Request) {
       }, { status: 200 });
     }
 
-    // Check if this is first load (no stats yet)
-    const isFirstLoad = !userData.stats;
+    // Check if this is first load or data needs refresh
+    const isFirstLoad = !userData.stats || !userData.stats.lastActivity;
+    
+    // Only refresh data if it's first load (no data in database) or force refreshed
+    const shouldRefreshData = isFirstLoad || forceRefresh;
 
-    // Only refresh data from GitHub if explicitly requested or if it's the first load
-    if (forceRefresh || isFirstLoad) {
-      console.log(`Refreshing GitHub data for user ${user.id} with username ${githubUsername}`);
-      
-      // Set initial progress state
-      updateProgress(user.id, 'initializing', 0, 100);
-      
-      // Call updateGitHubUserData with progress callback
-      const githubData = await updateGitHubUserData(
-        user.id,
-        timeRange,
-        // Progress callback function with enhanced details
-        (stage: string, completed: number, total: number, details?: string, orgName?: string) => {
-          if (user && user.id) {
-            updateProgress(user.id, stage, completed, total, details, orgName);
+    try {
+      // Only refresh data if explicitly requested or if no data exists
+      if (shouldRefreshData) {
+        console.log(`Refreshing GitHub data for user ${user.id} with username ${githubUsername}`);
+        
+        // Set initial progress state
+        updateProgress(user.id, 'initializing', 0, 100);
+        
+        // Call updateGitHubUserData with progress callback
+        const githubData = await updateGitHubUserData(
+          user.id,
+          timeRange,
+          // Progress callback function with enhanced details
+          (stage: string, completed: number, total: number, details?: string, orgName?: string) => {
+            if (user && user.id) {
+              updateProgress(user.id, stage, completed, total, details, orgName);
+            }
           }
+        );
+        
+        // Get the updated user with fresh data
+        const updatedUser = await prisma.user.findUnique({
+          where: { id: user.id },
+          include: { 
+            stats: true,
+            achievements: true
+          },
+        });
+        
+        if (!updatedUser) {
+          throw new Error("Failed to get updated user data");
         }
-      );
+        
+        const response: any = {
+          stats: {
+            ...(updatedUser.stats || {}),
+            points: updatedUser.points,
+            level: Math.floor(updatedUser.points / 100) + 1,
+            totalLinesChanged: githubData.totalLinesChanged,
+            stars: githubData.stars,
+            repos: githubData.repos,
+            currentStreak: githubData.currentStreak,
+            longestStreak: githubData.longestStreak,
+            activeDays: githubData.activeDays,
+            totalRepositoriesImpacted: githubData.totalRepositoriesImpacted
+          },
+          achievements: updatedUser.achievements || [],
+          timeRange,
+          connected: true,
+          refreshed: true,
+        };
+
+        if (debug) {
+          response.debug = {
+            userId: user.id,
+            githubUsername,
+            timeRange,
+            refreshReason: isFirstLoad ? "firstLoad" : "forceRefresh",
+          };
+        }
+
+        return NextResponse.json(response);
+      } 
       
-      // Get the updated user with fresh data
-      const updatedUser = await prisma.user.findUnique({
-        where: { id: user.id },
-        include: { 
-          stats: true,
-          achievements: true
-        },
-      });
-      
-      if (!updatedUser) {
-        throw new Error("Failed to get updated user data");
-      }
-      
+      // Return cached data from database
       const response: any = {
-        stats: updatedUser.stats || {},
-        achievements: updatedUser.achievements || [],
+        stats: {
+          ...(userData.stats || {}),
+          points: userData.points,
+          level: Math.floor(userData.points / 100) + 1,
+        },
+        achievements: userData.achievements || [],
         timeRange,
         connected: true,
-        refreshed: true,
+        cached: true,
       };
 
       if (debug) {
@@ -94,34 +134,22 @@ export async function GET(req: Request) {
           userId: user.id,
           githubUsername,
           timeRange,
-          refreshReason: isFirstLoad ? "firstLoad" : "forceRefresh",
-          lastRefreshed: updatedUser.stats?.lastRefreshed
+          fromCache: true,
         };
       }
 
       return NextResponse.json(response);
-    } 
-    
-    // Return data from database
-    const response: any = {
-      stats: userData.stats || {},
-      achievements: userData.achievements || [],
-      timeRange,
-      connected: true,
-      cached: true,
-    };
-
-    if (debug) {
-      response.debug = {
-        userId: user.id,
-        githubUsername,
+    } catch (error: any) {
+      console.error("Error fetching GitHub user stats:", error);
+      return NextResponse.json({
+        error: "Failed to fetch GitHub user stats",
+        message: error.message || "Unknown error",
+        stats: null,
+        achievements: [],
         timeRange,
-        fromCache: true,
-        lastRefreshed: userData.stats?.lastRefreshed
-      };
+        connected: true,
+      }, { status: 500 });
     }
-
-    return NextResponse.json(response);
   } catch (error: any) {
     console.error("Error in GitHub stats API:", error);
     return NextResponse.json(
@@ -168,7 +196,7 @@ export async function POST(req: Request) {
     }
 
     try {
-      // Update GitHub data
+      // Always update GitHub data for POST requests (manual refresh)
       const githubData = await updateGitHubUserData(
         user.id, 
         timeRange,
@@ -219,21 +247,14 @@ export async function POST(req: Request) {
 
       return NextResponse.json(response);
     } catch (error: any) {
-      console.error("Error updating GitHub user stats:", error);
+      console.error("Error updating GitHub stats:", error);
       return NextResponse.json({
-        error: "Failed to update GitHub user stats",
+        error: "Failed to update GitHub stats",
         message: error.message || "Unknown error",
-        connected: true,
       }, { status: 500 });
     }
   } catch (error: any) {
     console.error("Error in GitHub stats update API:", error);
-    return NextResponse.json(
-      { 
-        error: "Failed to update GitHub stats",
-        message: error.message || "Unknown error",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to update stats" }, { status: 500 });
   }
 } 
