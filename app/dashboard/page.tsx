@@ -953,10 +953,7 @@ export default function DashboardPage() {
                       `💻 ${stats.codeSubmissions || 0} Total code submissions\n` +
                       `🔀 ${stats.pullRequests} Pull Requests\n` +
                       `🔥 ${stats.currentStreak || stats.streak || 0} Day Streak (Best: ${stats.bestStreak || 0})\n` +
-                      `⭐ ${stats.stars || 0} Stars across ${stats.repos || 0} repos\n` +
                       `📈 ${stats.totalLinesChanged?.toLocaleString() || 0} Code impact contributions\n` +
-                      `📅 ${stats.activeDays || 0} Active days past year\n` +
-                      `👀 ${stats.prReviews || 0} Code reviews\n\n` +
                       `Track your GitHub stats at https://cloutnest.com with CloutNest`;
                     
                     // URL encode the tweet text
