@@ -589,15 +589,15 @@ export default function DashboardPage() {
   // New component to explain GitHub permissions
   const GitHubPermissionsInfo = () => (
     <div className="mt-4 p-4 bg-muted rounded-lg text-sm">
-      <h4 className="font-semibold mb-2">GitHub Permissions - Read-Only Access:</h4>
+      <h4 className="font-semibold mb-2">Why we need these GitHub permissions:</h4>
       <ul className="list-disc pl-5 space-y-1">
         <li><span className="font-medium">read:user, user:email</span> - To identify you and access your public profile</li>
-        <li><span className="font-medium">public_repo</span> - To read your public repositories only</li>
-        <li><span className="font-medium">read:org</span> - To discover public repositories in organizations you contribute to</li>
-        <li><span className="font-medium">read:project</span> - To find public projects you&apos;ve worked on</li>
+        <li><span className="font-medium">repo</span> - To access all your repositories, including private ones (if any)</li>
+        <li><span className="font-medium">read:org</span> - To discover repositories in organizations you contribute to</li>
+        <li><span className="font-medium">read:project</span> - To find all projects you&apos;ve worked on</li>
       </ul>
       <p className="mt-2 text-xs text-muted-foreground">
-        We only request read-only access to calculate your coding stats. We never modify your repositories or make any changes on your behalf.
+        We only use these permissions to calculate your coding stats. We never modify your repositories or make changes on your behalf.
       </p>
     </div>
   );
@@ -786,9 +786,6 @@ export default function DashboardPage() {
                 <p className="text-sm md:text-base text-muted-foreground">
                   Level {stats.level} Coder · {stats.points} XP
                 </p>
-                <p className="text-xs text-blue-400 mt-1">
-                  Note: CloutNest only tracks your public repositories to protect your privacy
-                </p>
               </div>
 
               <div className="flex items-center gap-2 md:gap-3 mt-2 md:mt-0">
@@ -905,7 +902,7 @@ export default function DashboardPage() {
               <Card className="neon-border bg-black/60">
                 <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">Commits</CardTitle>
-                  <CardDescription className="text-xs">Public repository activity</CardDescription>
+                  <CardDescription className="text-xs">Total code submissions</CardDescription>
                 </CardHeader>
                 <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   <div className="flex items-center">
@@ -925,7 +922,7 @@ export default function DashboardPage() {
               <Card className="neon-border bg-black/60">
                 <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">Pull Requests</CardTitle>
-                  <CardDescription className="text-xs">Public repo contributions</CardDescription>
+                  <CardDescription className="text-xs">Contributions & reviews</CardDescription>
                 </CardHeader>
                 <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   <div className="flex items-center">
@@ -945,7 +942,7 @@ export default function DashboardPage() {
               <Card className="neon-border bg-black/60">
                 <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">Coding Streak</CardTitle>
-                  <CardDescription className="text-xs">Public commit frequency</CardDescription>
+                  <CardDescription className="text-xs">Consecutive days coding</CardDescription>
                 </CardHeader>
                 <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   <div className="flex items-center">
@@ -963,7 +960,7 @@ export default function DashboardPage() {
               <Card className="neon-border bg-black/60">
                 <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">Stars</CardTitle>
-                  <CardDescription className="text-xs">Public repo stars</CardDescription>
+                  <CardDescription className="text-xs">Repository stars received</CardDescription>
                 </CardHeader>
                 <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   <div className="flex items-center">
@@ -984,7 +981,7 @@ export default function DashboardPage() {
               <Card className="neon-border bg-black/60">
                 <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">Code Impact</CardTitle>
-                  <CardDescription className="text-xs">Public repo contributions</CardDescription>
+                  <CardDescription className="text-xs">Total contributions</CardDescription>
                 </CardHeader>
                 <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   <div className="flex items-center">
@@ -1006,7 +1003,7 @@ export default function DashboardPage() {
               <Card className="neon-border bg-black/60">
                 <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">Active Days</CardTitle>
-                  <CardDescription className="text-xs">Public activity days</CardDescription>
+                  <CardDescription className="text-xs">Days with activity</CardDescription>
                 </CardHeader>
                 <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   <div className="flex items-center">
@@ -1024,7 +1021,7 @@ export default function DashboardPage() {
               <Card className="neon-border bg-black/60">
                 <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">PR Reviews</CardTitle>
-                  <CardDescription className="text-xs">Public PR reviews</CardDescription>
+                  <CardDescription className="text-xs">Reviews conducted</CardDescription>
                 </CardHeader>
                 <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   <div className="flex items-center">

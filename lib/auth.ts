@@ -35,7 +35,7 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
-          scope: requiredGitHubScopes.join(" ")
+          scope: "read:user user:email repo"
         }
       },
       profile(profile) {
