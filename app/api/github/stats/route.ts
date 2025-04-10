@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { getGitHubUserStats, updateGitHubUserData, TimeRange } from "@/lib/github";
-import { updateProgress } from './progress/route';
+import { updateProgress } from "@/lib/progress";
 
 export async function GET(req: Request) {
   try {

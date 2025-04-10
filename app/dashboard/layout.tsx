@@ -87,7 +87,7 @@ export default function DashboardLayout({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const cachedData = localStorage.getItem('pulsecode_githubData')
+        const cachedData = localStorage.getItem('CloutNest_githubData')
         if (cachedData) {
           const parsedData = JSON.parse(cachedData)
           // Only use the cached stats if they exist and have a timestamp that isn't too old
@@ -132,7 +132,7 @@ export default function DashboardLayout({
         <div className="p-6 flex flex-col h-full">
           <div className="flex items-center gap-3 mb-8">
             <Code2 className="h-8 w-8 text-pink-500" />
-            <span className="text-xl font-bold pixel-font">PulseCode</span>
+            <span className="text-xl font-bold pixel-font">CloutNest</span>
           </div>
 
           <div className="flex justify-center mb-8">

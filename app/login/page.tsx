@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
 import { Github, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,17 @@ import { useToast } from "@/hooks/use-toast";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+// Loading fallback for the suspense boundary
+const AuthFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background-start to-background-end">
+    <div className="w-full max-w-md p-8 space-y-8 bg-black/60 backdrop-blur-xl rounded-lg border border-white/10 flex justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+    </div>
+  </div>
+);
+
+// Inner component that uses useSearchParams
+const LoginContent = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { status } = useSession();
@@ -66,7 +76,7 @@ export default function LoginPage() {
         className="w-full max-w-md p-8 space-y-8 bg-black/60 backdrop-blur-xl rounded-lg border border-white/10"
       >
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-white">Welcome to PulseCode</h1>
+          <h1 className="text-3xl font-bold text-white">Welcome to CloutNest</h1>
           <p className="mt-2 text-muted-foreground">
             Sign in with your GitHub account to track your coding journey
           </p>
@@ -88,5 +98,14 @@ export default function LoginPage() {
         </div>
       </motion.div>
     </div>
+  );
+};
+
+// Main component that uses Suspense
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<AuthFallback />}>
+      <LoginContent />
+    </Suspense>
   );
 }

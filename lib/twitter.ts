@@ -12,7 +12,7 @@ export async function postTweet(userId: string, achievement: string) {
     }
 
     const tweet = `🎮 Achievement Unlocked: ${achievement}! 
-🚀 Keep building in public with @PulseCodeApp`;
+🚀 Keep building in public with @CloutNestApp`;
 
     await twitterClient.v2.tweet(tweet);
     return true;

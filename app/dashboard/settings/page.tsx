@@ -421,7 +421,7 @@ export default function SettingsPage() {
                     <div>
                       <h4 className="text-sm font-medium mb-2">About GitHub Connection</h4>
                       <p className="text-sm text-muted-foreground">
-                        Your GitHub connection allows PulseCode to analyze your public and private 
+                        Your GitHub connection allows CloutNest to analyze your public and private 
                         repositories to provide insights into your coding activity.
                       </p>
                     </div>

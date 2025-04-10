@@ -13,7 +13,7 @@ export default function Home() {
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
               <Code2 className="h-8 w-8 text-pink-500" />
-              <span className="ml-2 text-xl font-bold pixel-font text-white">PulseCode</span>
+              <span className="ml-2 text-xl font-bold pixel-font text-white">CloutNest</span>
             </div>
             <div className="flex items-center gap-4">
               <Link href="/login">
@@ -62,7 +62,7 @@ export default function Home() {
             </Button>
             <Button className="neon-button bg-blue-500 hover:bg-blue-600 text-lg px-8 py-6">
               <Twitter className="mr-2 h-5 w-5" />
-              Connect with X
+              Share with X
             </Button>
           </motion.div>
 
@@ -145,7 +145,7 @@ export default function Home() {
 
       <footer className="py-8 border-t border-white/10">
         <div className="max-w-7xl mx-auto px-4 text-center text-gray-400">
-          <p>© 2024 PulseCode. All rights reserved.</p>
+          <p>© 2024 CloutNest. All rights reserved.</p>
         </div>
       </footer>
     </div>

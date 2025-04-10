@@ -1,4 +1,4 @@
-# PostgreSQL Setup for PulseCode
+# PostgreSQL Setup for CloutNest
 
 This project now uses PostgreSQL instead of MongoDB. Follow these steps to set up your local environment.
 
@@ -13,13 +13,13 @@ brew install postgresql@14
 brew services start postgresql@14
 
 # Create the database
-createdb pulsecode
+createdb CloutNest
 ```
 
 ### Windows
 1. Download and install PostgreSQL from [the official website](https://www.postgresql.org/download/windows/)
 2. During installation, set password to 'postgres' for user 'postgres'
-3. After installation, open pgAdmin 4 and create a new database named 'pulsecode'
+3. After installation, open pgAdmin 4 and create a new database named 'CloutNest'
 
 ### Linux (Ubuntu/Debian)
 ```bash
@@ -33,7 +33,7 @@ sudo systemctl enable postgresql
 
 # Switch to postgres user and create the database
 sudo -i -u postgres
-createdb pulsecode
+createdb CloutNest
 ```
 
 ## Option 2: Using Docker
@@ -42,13 +42,13 @@ If you have Docker installed and running:
 
 ```bash
 # Start PostgreSQL container
-docker run --name pulsecode-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=pulsecode -p 5432:5432 -d postgres:14
+docker run --name CloutNest-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=CloutNest -p 5432:5432 -d postgres:14
 
 # To stop the container
-docker stop pulsecode-postgres
+docker stop CloutNest-postgres
 
 # To start it again later
-docker start pulsecode-postgres
+docker start CloutNest-postgres
 ```
 
 ## Verify the connection
@@ -70,7 +70,7 @@ npm run dev
 Make sure your `.env` file contains the correct DATABASE_URL:
 
 ```
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/pulsecode?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/CloutNest?schema=public"
 ```
 
 Adjust the username, password, or host as needed based on your setup. 

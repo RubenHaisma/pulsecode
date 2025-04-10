@@ -1,39 +1,22 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-
-// Create a global progress store keyed by user ID
-const progressStore: Map<string, { 
-  stage: string; 
-  completed: number; 
-  total: number;
-  details?: string;
-  orgName?: string; 
-}> = new Map();
-
-// Track active controllers to prevent errors when a connection closes
-const activeControllers = new Map<string, boolean>();
-
-// Function to update progress for a user
-export function updateProgress(
-  userId: string, 
-  stage: string, 
-  completed: number, 
-  total: number, 
-  details?: string,
-  orgName?: string
-) {
-  progressStore.set(userId, { stage, completed, total, details, orgName });
-}
+import { progressStore, activeControllers } from "@/lib/progress";
 
 // Server-sent events (SSE) endpoint for progress updates
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    if (!user || !user.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = user.id; // Extract as local variable to help TypeScript
+    // The getCurrentUser function from auth.ts returns a User object that may include id
+    // but TypeScript doesn't know this from the generic Session type
+    // @ts-ignore - we know the user will have an id if authenticated
+    const userId = user.id;
+    if (!userId) {
+      return NextResponse.json({ error: "User ID not found" }, { status: 400 });
+    }
 
     // Set headers for SSE
     const headers = {

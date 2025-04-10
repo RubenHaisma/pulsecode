@@ -328,13 +328,13 @@ export default function DashboardPage() {
     if (typeof window !== 'undefined' && status === "authenticated") {
       try {
         // Load time range preference
-        const savedTimeRange = localStorage.getItem('pulsecode_timeRange');
+        const savedTimeRange = localStorage.getItem('CloutNest_timeRange');
         if (savedTimeRange) {
           setTimeRange(savedTimeRange);
         }
         
         // Load cached data
-        const cachedData = localStorage.getItem('pulsecode_githubData');
+        const cachedData = localStorage.getItem('CloutNest_githubData');
         if (cachedData) {
           const parsedData = JSON.parse(cachedData);
           
@@ -486,8 +486,8 @@ export default function DashboardPage() {
       setDataLastUpdated(timestamp);
       
       try {
-        localStorage.setItem('pulsecode_timeRange', selectedTimeRange);
-        localStorage.setItem('pulsecode_githubData', JSON.stringify({
+        localStorage.setItem('CloutNest_timeRange', selectedTimeRange);
+        localStorage.setItem('CloutNest_githubData', JSON.stringify({
           stats: {
             commits: statsData.stats?.commits || 0,
             pullRequests: statsData.stats?.pullRequests || 0,
@@ -528,7 +528,7 @@ export default function DashboardPage() {
   // Handle time range change
   const handleTimeRangeChange = (value: string) => {
     setTimeRange(value);
-    localStorage.setItem('pulsecode_timeRange', value);
+    localStorage.setItem('CloutNest_timeRange', value);
     fetchGitHubData(value);
   };
   
@@ -701,7 +701,7 @@ export default function DashboardPage() {
         <div className="p-6 flex flex-col h-full">
           <div className="flex items-center gap-3 mb-8">
             <Code2 className="h-8 w-8 text-pink-500" />
-            <span className="text-xl font-bold pixel-font">PulseCode</span>
+            <span className="text-xl font-bold pixel-font">CloutNest</span>
           </div>
 
           <div className="flex justify-center mb-8">
@@ -818,12 +818,12 @@ export default function DashboardPage() {
                   className="bg-black/60 border-white/20 hover:bg-sky-900/30 transition-colors"
                   onClick={() => {
                     // Create tweet text with user stats
-                    const tweetText = `🚀 My coding stats on PulseCode:\n\n` +
-                      `Level ${stats.level} Coder\n` +
-                      `${stats.commits} Commits\n` +
-                      `${stats.pullRequests} Pull Requests\n` +
+                    const tweetText = `🚀 My coding stats on CloutNest:\n\n` +
+                      `✨ Level ${stats.level} Coder\n` +
+                      `📊 ${stats.commits} Commits\n` +
+                      `🔀 ${stats.pullRequests} Pull Requests\n` +
                       `🔥 ${stats.currentStreak || stats.streak || 0} Day Streak\n\n` +
-                      `Track your GitHub stats with @PulseCodeApp #coding #github`;
+                      `Track your GitHub stats at https://cloutnest.com with CloutNest`;
                     
                     // URL encode the tweet text
                     const encodedTweet = encodeURIComponent(tweetText);
