@@ -301,6 +301,18 @@ const MobileNav = ({ user, level }: { user: any, level: number }) => {
                 <History className="mr-2 h-4 w-4" />
                 Activity
               </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  router.push("/dashboard/timeline");
+                  setIsOpen(false);
+                }}
+              >
+                <History className="mr-2 h-4 w-4" />
+                Timeline
+              </Button>
+              
             </nav>
 
             <div className="mt-auto border-t border-white/10 pt-6">
@@ -1001,7 +1013,7 @@ export default function DashboardPage() {
 
       {/* Main content - adjusted for mobile layout */}
       <main className="lg:pl-64">
-        <div className="p-4 sm:p-6 lg:p-8">
+        <div className="p-4 sm:p-6 lg:p-8 lg:pl-0">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
