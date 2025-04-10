@@ -151,6 +151,10 @@ export interface GitHubUserData {
   longestStreak?: number;
   activeDays?: number;
   totalRepositoriesImpacted?: number;
+  codeSubmissions?: number;
+  bestStreak?: number;
+  codeImpact?: number;
+  prReviews?: number;
 }
 
 export type TimeRange = 'today' | 'week' | 'month' | 'year' | 'all';
@@ -1910,7 +1914,11 @@ export async function getGitHubUserStats(
         currentStreak: streakData.currentStreak,
         longestStreak: streakData.longestStreak,
         activeDays: streakData.activeDays.size,
-        totalRepositoriesImpacted: impactData.totalRepositories
+        totalRepositoriesImpacted: impactData.totalRepositories,
+        codeSubmissions: totalCommits,
+        bestStreak: streakData.longestStreak,
+        codeImpact: impactData.totalLinesChanged,
+        prReviews: reviewsCount
       };
     })();
     
@@ -1936,7 +1944,11 @@ export async function getGitHubUserStats(
       currentStreak: 0,
       longestStreak: 0,
       activeDays: 0,
-      totalRepositoriesImpacted: 0
+      totalRepositoriesImpacted: 0,
+      codeSubmissions: 0,
+      bestStreak: 0,
+      codeImpact: 0,
+      prReviews: 0
     };
   }
 }
@@ -2214,6 +2226,16 @@ export async function updateGitHubUserData(
         reviews: githubData.reviews,
         privateRepos: githubData.privateRepos,
         publicRepos: githubData.publicRepos,
+        // Add these fields to fix persistence issues
+        totalLinesChanged: githubData.totalLinesChanged || 0,
+        codeImpact: githubData.codeImpact || 0,
+        currentStreak: githubData.currentStreak || 0,
+        longestStreak: githubData.longestStreak || 0,
+        activeDays: githubData.activeDays || 0,
+        totalRepositoriesImpacted: githubData.totalRepositoriesImpacted || 0,
+        codeSubmissions: githubData.commits || 0, // Use commits as fallback
+        bestStreak: githubData.longestStreak || 0, // Use longestStreak as bestStreak
+        prReviews: githubData.reviews || 0 // Use reviews as prReviews
       },
       create: {
         userId,
@@ -2225,6 +2247,16 @@ export async function updateGitHubUserData(
         reviews: githubData.reviews,
         privateRepos: githubData.privateRepos,
         publicRepos: githubData.publicRepos,
+        // Add these fields to fix persistence issues
+        totalLinesChanged: githubData.totalLinesChanged || 0,
+        codeImpact: githubData.codeImpact || 0,
+        currentStreak: githubData.currentStreak || 0,
+        longestStreak: githubData.longestStreak || 0,
+        activeDays: githubData.activeDays || 0,
+        totalRepositoriesImpacted: githubData.totalRepositoriesImpacted || 0,
+        codeSubmissions: githubData.commits || 0, // Use commits as fallback
+        bestStreak: githubData.longestStreak || 0, // Use longestStreak as bestStreak
+        prReviews: githubData.reviews || 0 // Use reviews as prReviews
       },
     });
     

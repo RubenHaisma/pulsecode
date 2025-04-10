@@ -84,6 +84,10 @@ model Stats {
   totalRepositoriesImpacted Int @default(0)
   stars         Int       @default(0)
   lastRefreshed DateTime  @default(now())
+  codeImpact    Int       @default(0)
+  codeSubmissions Int     @default(0)
+  bestStreak    Int       @default(0)
+  prReviews     Int       @default(0)
 }
 
 model Achievement {

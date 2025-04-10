@@ -405,6 +405,146 @@ const DesktopSidebar = ({ session, stats }: { session: any, stats: Stats }) => {
   );
 };
 
+// Create a new component for the contributions timeline
+const ContributionsTimeline = ({ activities }: { activities: any[] }) => {
+  // Process the activity data to get counts by date
+  const processActivitiesForTimeline = () => {
+    const activityByDate = new Map<string, number>();
+    const activityByMonth = new Map<string, number>();
+    
+    // Track the earliest and latest dates for the range
+    let earliestDate: Date | null = null;
+    let latestDate: Date | null = null;
+    
+    // Sort activities by date
+    const sortedActivities = [...activities].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    
+    // Extract timeline data
+    sortedActivities.forEach(activity => {
+      const date = new Date(activity.date);
+      const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // YYYY-MM
+      
+      // Update date count
+      activityByDate.set(dateKey, (activityByDate.get(dateKey) || 0) + 1);
+      
+      // Update month count
+      activityByMonth.set(monthKey, (activityByMonth.get(monthKey) || 0) + 1);
+      
+      // Track date range
+      if (!earliestDate || date < earliestDate) {
+        earliestDate = date;
+      }
+      if (!latestDate || date > latestDate) {
+        latestDate = date;
+      }
+    });
+    
+    // Convert maps to arrays for easier rendering
+    const dailyData = Array.from(activityByDate.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    
+    const monthlyData = Array.from(activityByMonth.entries())
+      .map(([month, count]) => ({ month, count }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+    
+    return {
+      dailyData,
+      monthlyData,
+      earliestDate,
+      latestDate,
+      maxDailyCount: Math.max(...dailyData.map(d => d.count)),
+      maxMonthlyCount: Math.max(...monthlyData.map(m => m.count))
+    };
+  };
+  
+  // Generate the timeline bars
+  const renderMonthlyBars = () => {
+    if (activities.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">No activity data available</p>
+        </div>
+      );
+    }
+    
+    const { monthlyData, maxMonthlyCount } = processActivitiesForTimeline();
+    
+    return (
+      <div className="flex flex-col space-y-1">
+        {monthlyData.map(({ month, count }) => {
+          // Calculate percentage of max for bar width
+          const percentage = Math.max(5, (count / maxMonthlyCount) * 100);
+          
+          // Extract year and month for display
+          const [year, monthNum] = month.split('-');
+          const monthDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
+          const monthName = monthDate.toLocaleString('default', { month: 'short' });
+          
+          return (
+            <div key={month} className="flex items-center text-xs">
+              <div className="w-16 flex-shrink-0">{monthName} {year}</div>
+              <div className="flex-1 h-6 bg-black/40 rounded-sm overflow-hidden flex items-center">
+                <div 
+                  className="h-full bg-gradient-to-r from-purple-600 to-pink-600 rounded-sm transition-all duration-500 ease-out"
+                  style={{ width: `${percentage}%` }}
+                >
+                  <div className="h-full w-full opacity-20 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.1)_10px,rgba(255,255,255,0.1)_20px)]"></div>
+                </div>
+                <span className="ml-2 text-white font-medium">{count}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+  
+  const getMostActiveTime = () => {
+    if (activities.length === 0) return null;
+    
+    const { monthlyData, maxMonthlyCount } = processActivitiesForTimeline();
+    
+    // Find the month with the most activity
+    const mostActiveMonth = monthlyData.reduce((max, current) => 
+      current.count > max.count ? current : max, 
+      { month: '', count: 0 }
+    );
+    
+    if (mostActiveMonth.month) {
+      const [year, monthNum] = mostActiveMonth.month.split('-');
+      const monthDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
+      const monthName = monthDate.toLocaleString('default', { month: 'long' });
+      
+      return (
+        <div className="text-sm mt-2 mb-4 px-3 py-2 bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded border border-purple-500/20">
+          <span className="font-medium">Most active period:</span> {monthName} {year} with {mostActiveMonth.count} contributions
+        </div>
+      );
+    }
+    
+    return null;
+  };
+  
+  return (
+    <Card className="neon-border bg-black/60">
+      <CardHeader>
+        <CardTitle className="text-lg">Coding Timeline</CardTitle>
+        <CardDescription>Your coding activity over time</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {getMostActiveTime()}
+        <div className="max-h-[300px] overflow-y-auto pr-2 scrollbar-thin">
+          {renderMonthlyBars()}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const [stats, setStats] = useState<Stats>({ 
@@ -499,13 +639,30 @@ export default function DashboardPage() {
       
       // Initial data fetch with default time range
       if (profileConnected) {
-        // Only fetch if data is stale or we don't have any data
-        if (isDataStale() || !dataLastUpdated) {
-          setLoadingPhase("Fetching your coding stats");
-          await fetchGitHubData(timeRange, false); // No need to force refresh on every load
-        } else if (!hasCache) {
+        // If we have local cached data, don't need to fetch from database yet
+        if (hasCache) {
           setLoading(false);
+          return;
         }
+        
+        // First try to just load data from database without refreshing from GitHub
+        try {
+          const response = await fetch(`/api/github/stats?timeRange=${timeRange}`);
+          const data = await response.json();
+          
+          if (response.ok && data.stats) {
+            // We have database data, use it
+            setLoadingPhase("Loading data from database");
+            await fetchGitHubData(timeRange, false);
+            return;
+          }
+        } catch (error) {
+          console.error("Error checking database data:", error);
+        }
+        
+        // If we reached here, we need to force refresh from GitHub
+        setLoadingPhase("No database data found, fetching from GitHub");
+        await fetchGitHubData(timeRange, true);
       } else {
         setLoading(false);
         if (!githubUsername) {
@@ -575,148 +732,224 @@ export default function DashboardPage() {
   const fetchGitHubData = async (selectedTimeRange: string, forceRefresh: boolean = false) => {
     setLoading(true);
     setFetchError(null);
-    setLoadingPhase("Fetching your GitHub data");
-    setLoadingProgress({ stage: 'initializing', completed: 0, total: 100 });
     
     try {
-      // Setup event source for progress updates
-      const eventSourceUrl = `/api/github/stats/progress`;
-      const eventSource = new EventSource(eventSourceUrl);
-      
-      // Listen for progress updates
-      eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.stage && data.completed !== undefined && data.total !== undefined) {
-          setLoadingProgress(data);
-          
-          // Update loading phase with more user-friendly messages
-          switch (data.stage) {
-            case 'discovering-repos':
-              setLoadingPhase(`Finding repositories (${Math.round(data.completed/data.total*100)}%)`);
-              break;
-            case 'processing-repos':
-              setLoadingPhase(`Processing repositories (${Math.round(data.completed/data.total*100)}%)`);
-              break;
-            case 'calculating-streak':
-              setLoadingPhase(`Analyzing coding streak (${Math.round(data.completed/data.total*100)}%)`);
-              break;
-            case 'calculating-impact':
-              setLoadingPhase(`Measuring code impact (${Math.round(data.completed/data.total*100)}%)`);
-              break;
-            case 'finalizing':
-              setLoadingPhase(`Finalizing (${Math.round(data.completed/data.total*100)}%)`);
-              break;
-            default:
-              setLoadingPhase(`Processing data (${Math.round(data.completed/data.total*100)}%)`);
+      if (forceRefresh) {
+        // Only set up EventSource for real-time progress when forcing refresh from GitHub
+        setLoadingPhase("Fetching your GitHub data from the source");
+        setLoadingProgress({ stage: 'initializing', completed: 0, total: 100 });
+        
+        // Setup event source for progress updates
+        const eventSourceUrl = `/api/github/stats/progress`;
+        const eventSource = new EventSource(eventSourceUrl);
+        
+        // Listen for progress updates
+        eventSource.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.stage && data.completed !== undefined && data.total !== undefined) {
+            setLoadingProgress(data);
+            
+            // Update loading phase with more user-friendly messages
+            switch (data.stage) {
+              case 'discovering-repos':
+                setLoadingPhase(`Finding repositories (${Math.round(data.completed/data.total*100)}%)`);
+                break;
+              case 'processing-repos':
+                setLoadingPhase(`Processing repositories (${Math.round(data.completed/data.total*100)}%)`);
+                break;
+              case 'calculating-streak':
+                setLoadingPhase(`Analyzing coding streak (${Math.round(data.completed/data.total*100)}%)`);
+                break;
+              case 'calculating-impact':
+                setLoadingPhase(`Measuring code impact (${Math.round(data.completed/data.total*100)}%)`);
+                break;
+              case 'finalizing':
+                setLoadingPhase(`Finalizing (${Math.round(data.completed/data.total*100)}%)`);
+                break;
+              default:
+                setLoadingPhase(`Processing data (${Math.round(data.completed/data.total*100)}%)`);
+            }
           }
-        }
-      };
-      
-      // Handle errors in the event stream
-      eventSource.onerror = () => {
-        console.error("EventSource failed");
+        };
+        
+        // Handle errors in the event stream
+        eventSource.onerror = () => {
+          console.error("EventSource failed");
+          eventSource.close();
+        };
+
+        // Fetch stats with selected time range, forcing refresh if needed
+        const statsResponse = await fetch(`/api/github/stats?timeRange=${selectedTimeRange}&forceRefresh=true`);
+        
+        // Close the event source after the main request is done
         eventSource.close();
-      };
+      
+        const statsData = await statsResponse.json();
 
-      // Fetch stats with selected time range, forcing refresh if needed
-      const statsResponse = await fetch(`/api/github/stats?timeRange=${selectedTimeRange}${forceRefresh ? '&forceRefresh=true' : ''}`);
-      
-      // Close the event source after the main request is done
-      eventSource.close();
-      
-      const statsData = await statsResponse.json();
-
-      if (!statsResponse.ok) {
-        console.error("Error fetching GitHub stats:", statsData);
-        setFetchError(statsData.error || "Failed to fetch GitHub stats");
-        setLoading(false);
-        return false;
-      }
-      
-      if (statsData.stats) {
-        setStats({
-          commits: statsData.stats.commits || 0,
-          pullRequests: statsData.stats.pullRequests || 0,
-          streak: statsData.stats.streak || 0,
-          points: statsData.stats.points || 0,
-          level: statsData.stats.level || 1,
-          totalLinesChanged: statsData.stats.totalLinesChanged || 0,
-          stars: statsData.stats.stars || 0,
-          repos: statsData.stats.repos || 0,
-          timeRange: selectedTimeRange,
-          contributions: statsData.stats.contributions || 0,
-          reviews: statsData.stats.reviews || 0,
-          privateRepos: statsData.stats.privateRepos || 0,
-          publicRepos: statsData.stats.publicRepos || 0,
-          currentStreak: statsData.stats.currentStreak || 0,
-          longestStreak: statsData.stats.longestStreak || 0,
-          activeDays: statsData.stats.activeDays || 0,
-          totalRepositoriesImpacted: statsData.stats.totalRepositoriesImpacted || 0,
-          codeSubmissions: statsData.stats.codeSubmissions || 0,
-          bestStreak: statsData.stats.bestStreak || 0,
-          codeImpact: statsData.stats.codeImpact || 0,
-          prReviews: statsData.stats.prReviews || 0,
-        });
-      }
-      
-      if (statsData.achievements) {
-        setAchievements(statsData.achievements);
-      }
-      
-      // Update loading phase for activity fetching
-      setLoadingPhase("Fetching your recent activity");
-      
-      // Fetch activities with the same time range
-      const activityResponse = await fetch(`/api/github/activity?timeRange=${selectedTimeRange}`);
-      const activityData = await activityResponse.json();
-      
-      if (!activityResponse.ok) {
-        console.error("Error fetching GitHub activity:", activityData);
-        setFetchError(activityData.error || "Failed to fetch GitHub activity");
-        setLoading(false);
-        return false;
-      }
-      
-      if (activityData.activities) {
-        setActivities(activityData.activities);
-      }
-      
-      // Save to localStorage
-      const timestamp = Date.now();
-      setDataLastUpdated(timestamp);
-      
-      try {
-        localStorage.setItem('CloutNest_timeRange', selectedTimeRange);
-        localStorage.setItem('CloutNest_githubData', JSON.stringify({
-          stats: {
-            commits: statsData.stats?.commits || 0,
-            pullRequests: statsData.stats?.pullRequests || 0,
-            streak: statsData.stats?.streak || 0,
-            points: statsData.stats?.points || 0,
-            level: statsData.stats?.level || 1,
-            totalLinesChanged: statsData.stats?.totalLinesChanged || 0,
-            stars: statsData.stats?.stars || 0,
-            repos: statsData.stats?.repos || 0,
+        if (!statsResponse.ok) {
+          console.error("Error fetching GitHub stats:", statsData);
+          setFetchError(statsData.error || "Failed to fetch GitHub stats");
+          setLoading(false);
+          return false;
+        }
+        
+        if (statsData.stats) {
+          setStats({
+            commits: statsData.stats.commits || 0,
+            pullRequests: statsData.stats.pullRequests || 0,
+            streak: statsData.stats.streak || 0,
+            points: statsData.stats.points || 0,
+            level: statsData.stats.level || 1,
+            totalLinesChanged: statsData.stats.totalLinesChanged || 0,
+            stars: statsData.stats.stars || 0,
+            repos: statsData.stats.repos || 0,
             timeRange: selectedTimeRange,
-            contributions: statsData.stats?.contributions || 0,
-            reviews: statsData.stats?.reviews || 0,
-            privateRepos: statsData.stats?.privateRepos || 0,
-            publicRepos: statsData.stats?.publicRepos || 0,
-            currentStreak: statsData.stats?.currentStreak || 0,
-            longestStreak: statsData.stats?.longestStreak || 0,
-            activeDays: statsData.stats?.activeDays || 0,
-            totalRepositoriesImpacted: statsData.stats?.totalRepositoriesImpacted || 0,
-            codeSubmissions: statsData.stats?.codeSubmissions || 0,
-            bestStreak: statsData.stats?.bestStreak || 0,
-            codeImpact: statsData.stats?.codeImpact || 0,
-            prReviews: statsData.stats?.prReviews || 0,
-          },
-          achievements: statsData.achievements || [],
-          activities: activityData.activities || [],
-          timestamp
-        }));
-      } catch (error) {
-        console.error("Error caching data:", error);
+            contributions: statsData.stats.contributions || 0,
+            reviews: statsData.stats.reviews || 0,
+            privateRepos: statsData.stats.privateRepos || 0,
+            publicRepos: statsData.stats.publicRepos || 0,
+            currentStreak: statsData.stats.currentStreak || 0,
+            longestStreak: statsData.stats.longestStreak || 0,
+            activeDays: statsData.stats.activeDays || 0,
+            totalRepositoriesImpacted: statsData.stats.totalRepositoriesImpacted || 0,
+            codeSubmissions: statsData.stats.codeSubmissions || 0,
+            bestStreak: statsData.stats.bestStreak || 0,
+            codeImpact: statsData.stats.codeImpact || 0,
+            prReviews: statsData.stats.prReviews || 0,
+          });
+        }
+        
+        if (statsData.achievements) {
+          setAchievements(statsData.achievements);
+        }
+        
+        // Update loading phase for activity fetching
+        setLoadingPhase("Fetching your recent activity");
+        
+        // Fetch activities with the same time range
+        const activityResponse = await fetch(`/api/github/activity?timeRange=${selectedTimeRange}`);
+        const activityData = await activityResponse.json();
+        
+        if (!activityResponse.ok) {
+          console.error("Error fetching GitHub activity:", activityData);
+          setFetchError(activityData.error || "Failed to fetch GitHub activity");
+          setLoading(false);
+          return false;
+        }
+        
+        if (activityData.activities) {
+          setActivities(activityData.activities);
+        }
+        
+        // Save to localStorage
+        const timestamp = Date.now();
+        setDataLastUpdated(timestamp);
+        
+        try {
+          localStorage.setItem('CloutNest_timeRange', selectedTimeRange);
+          localStorage.setItem('CloutNest_githubData', JSON.stringify({
+            stats: {
+              commits: statsData.stats?.commits || 0,
+              pullRequests: statsData.stats?.pullRequests || 0,
+              streak: statsData.stats?.streak || 0,
+              points: statsData.stats?.points || 0,
+              level: statsData.stats?.level || 1,
+              totalLinesChanged: statsData.stats?.totalLinesChanged || 0,
+              stars: statsData.stats?.stars || 0,
+              repos: statsData.stats?.repos || 0,
+              timeRange: selectedTimeRange,
+              contributions: statsData.stats?.contributions || 0,
+              reviews: statsData.stats?.reviews || 0,
+              privateRepos: statsData.stats?.privateRepos || 0,
+              publicRepos: statsData.stats?.publicRepos || 0,
+              currentStreak: statsData.stats?.currentStreak || 0,
+              longestStreak: statsData.stats?.longestStreak || 0,
+              activeDays: statsData.stats?.activeDays || 0,
+              totalRepositoriesImpacted: statsData.stats?.totalRepositoriesImpacted || 0,
+              codeSubmissions: statsData.stats?.codeSubmissions || 0,
+              bestStreak: statsData.stats?.bestStreak || 0,
+              codeImpact: statsData.stats?.codeImpact || 0,
+              prReviews: statsData.stats?.prReviews || 0,
+            },
+            achievements: statsData.achievements || [],
+            activities: activityData.activities || [],
+            timestamp
+          }));
+        } catch (error) {
+          console.error("Error caching data:", error);
+        }
+      } else {
+        // Fetch data from database (no progress tracking needed)
+        setLoadingPhase("Loading your coding stats from database");
+        
+        // Fetch stats without forcing refresh (will use cached data in DB)
+        const statsResponse = await fetch(`/api/github/stats?timeRange=${selectedTimeRange}`);
+        const statsData = await statsResponse.json();
+
+        if (!statsResponse.ok) {
+          console.error("Error fetching GitHub stats:", statsData);
+          setFetchError(statsData.error || "Failed to fetch GitHub stats");
+          setLoading(false);
+          return false;
+        }
+        
+        if (statsData.stats) {
+          setStats({
+            commits: statsData.stats.commits || 0,
+            pullRequests: statsData.stats.pullRequests || 0,
+            streak: statsData.stats.streak || 0,
+            points: statsData.stats.points || 0,
+            level: statsData.stats.level || 1,
+            totalLinesChanged: statsData.stats.totalLinesChanged || 0,
+            stars: statsData.stats.stars || 0,
+            repos: statsData.stats.repos || 0,
+            timeRange: selectedTimeRange,
+            contributions: statsData.stats.contributions || 0,
+            reviews: statsData.stats.reviews || 0,
+            privateRepos: statsData.stats.privateRepos || 0,
+            publicRepos: statsData.stats.publicRepos || 0,
+            currentStreak: statsData.stats.currentStreak || 0,
+            longestStreak: statsData.stats.longestStreak || 0,
+            activeDays: statsData.stats.activeDays || 0,
+            totalRepositoriesImpacted: statsData.stats.totalRepositoriesImpacted || 0,
+            codeSubmissions: statsData.stats.codeSubmissions || 0,
+            bestStreak: statsData.stats.bestStreak || 0,
+            codeImpact: statsData.stats.codeImpact || 0,
+            prReviews: statsData.stats.prReviews || 0,
+          });
+        }
+        
+        if (statsData.achievements) {
+          setAchievements(statsData.achievements);
+        }
+        
+        // Fetch activities for the timeline
+        const activityResponse = await fetch(`/api/github/activity?timeRange=${selectedTimeRange}`);
+        const activityData = await activityResponse.json();
+        
+        if (activityData.activities) {
+          setActivities(activityData.activities);
+        }
+        
+        // Update last updated timestamp
+        const timestamp = Date.now();
+        setDataLastUpdated(timestamp);
+        
+        // Update local storage
+        try {
+          localStorage.setItem('CloutNest_timeRange', selectedTimeRange);
+          localStorage.setItem('CloutNest_githubData', JSON.stringify({
+            stats: {
+              ...statsData.stats,
+              timeRange: selectedTimeRange,
+            },
+            achievements: statsData.achievements || [],
+            activities: activityData.activities || [],
+            timestamp
+          }));
+        } catch (error) {
+          console.error("Error caching data:", error);
+        }
       }
       
       return true;
@@ -1175,6 +1408,11 @@ export default function DashboardPage() {
                   </Badge>
                 </CardFooter>
               </Card>
+            </div>
+            
+            {/* Add the Contributions Timeline */}
+            <div className="mt-6">
+              <ContributionsTimeline activities={activities} />
             </div>
 
             {/* Achievements - 1 column on small mobile, 2 on larger mobile, 4 on desktop */}
