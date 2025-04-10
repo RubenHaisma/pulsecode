@@ -392,6 +392,14 @@ const DesktopSidebar = ({ session, stats }: { session: any, stats: Stats }) => {
             <History className="mr-2 h-4 w-4" />
             Activity
           </Button>
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={() => router.push("/dashboard/timeline")}
+          >
+            <History className="mr-2 h-4 w-4" />
+            Timeline 
+          </Button>
         </nav>
 
         <div className="mt-auto border-t border-white/10 pt-6">
