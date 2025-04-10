@@ -747,14 +747,6 @@ export default function DashboardPage() {
               <History className="mr-2 h-4 w-4" />
               Activity
             </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start"
-              onClick={() => router.push("/dashboard/settings")}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </Button>
           </nav>
 
           <div className="mt-auto border-t border-white/10 pt-6">
@@ -852,9 +844,6 @@ export default function DashboardPage() {
                     }
                   </>
                 ) : 'No data loaded yet'}
-                <span className="ml-2 text-xs text-blue-400">
-                  (Data is loaded from database unless you click &quot;Refresh from GitHub&quot;)
-                </span>
               </div>
               <div className="flex space-x-2">
                 <TimeRangeSelector 
