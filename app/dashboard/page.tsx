@@ -27,6 +27,8 @@ import {
   Trophy,
   Twitter,
   Loader2,
+  Menu,
+  X,
 } from "lucide-react"
 import { useEffect, useState, Suspense } from "react"
 import { useSession, signOut } from "next-auth/react"
@@ -55,6 +57,13 @@ import {
 } from "@/components/ui/dialog"
 import { GithubConnectForm } from "@/components/github-connect-form"
 import { useToast } from "@/hooks/use-toast"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 
 // Define types
 interface AchievementData {
@@ -210,6 +219,190 @@ const getTimeRangeLabel = (range: string): string => {
     case 'all': return 'All time';
     default: return 'All time';
   }
+};
+
+// Add this component for the mobile nav bar
+const MobileNav = ({ user, level }: { user: any, level: number }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
+  
+  return (
+    <div className="flex lg:hidden items-center justify-between w-full p-4 border-b border-white/10 bg-black/80 backdrop-blur-xl z-20 sticky top-0">
+      <div className="flex items-center gap-3">
+        <Code2 className="h-6 w-6 text-pink-500" />
+        <span className="text-lg font-bold pixel-font">CloutNest</span>
+      </div>
+      
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <Menu className="h-6 w-6" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-[80vw] sm:w-[350px] bg-black/95 border-r border-white/10 p-0">
+          <SheetHeader className="p-6 border-b border-white/10">
+            <SheetTitle className="flex items-center gap-3">
+              <Code2 className="h-8 w-8 text-pink-500" />
+              <span className="text-xl font-bold pixel-font">CloutNest</span>
+            </SheetTitle>
+          </SheetHeader>
+          
+          <div className="p-6 flex flex-col h-[calc(100%-80px)]">
+            <div className="flex justify-center mb-8">
+              <ErrorBoundary>
+                <Suspense fallback={<SimpleOrb />}>
+                  <CodeOrb />
+                </Suspense>
+              </ErrorBoundary>
+            </div>
+
+            <nav className="space-y-2 flex-1">
+              <Button
+                variant="ghost"
+                className="w-full justify-start neon-button"
+                onClick={() => {
+                  router.push("/dashboard");
+                  setIsOpen(false);
+                }}
+              >
+                <BarChart className="mr-2 h-4 w-4" />
+                Dashboard
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  router.push("/dashboard/leaderboard");
+                  setIsOpen(false);
+                }}
+              >
+                <Trophy className="mr-2 h-4 w-4" />
+                Leaderboard
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  router.push("/dashboard/achievements");
+                  setIsOpen(false);
+                }}
+              >
+                <Star className="mr-2 h-4 w-4" />
+                Achievements
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  router.push("/dashboard/activity");
+                  setIsOpen(false);
+                }}
+              >
+                <History className="mr-2 h-4 w-4" />
+                Activity
+              </Button>
+            </nav>
+
+            <div className="mt-auto border-t border-white/10 pt-6">
+              <div className="flex items-center gap-3 mb-4">
+                <CodeAvatar user={user} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">Level {level}</p>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full justify-start" 
+                onClick={() => signOut({ callbackUrl: "/login" })}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+};
+
+// Desktop sidebar component
+const DesktopSidebar = ({ session, stats }: { session: any, stats: Stats }) => {
+  const router = useRouter();
+  
+  return (
+    <div className="hidden lg:block fixed top-0 left-0 w-64 h-screen border-r border-white/10 bg-black/60 backdrop-blur-xl z-10">
+      <div className="p-6 flex flex-col h-full">
+        <div className="flex items-center gap-3 mb-8">
+          <Code2 className="h-8 w-8 text-pink-500" />
+          <span className="text-xl font-bold pixel-font">CloutNest</span>
+        </div>
+
+        <div className="flex justify-center mb-8">
+          <ErrorBoundary>
+            <Suspense fallback={<SimpleOrb />}>
+              <CodeOrb />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
+
+        <nav className="space-y-2 flex-1">
+          <Button
+            variant="ghost"
+            className="w-full justify-start neon-button"
+          >
+            <BarChart className="mr-2 h-4 w-4" />
+            Dashboard
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={() => router.push("/dashboard/leaderboard")}
+          >
+            <Trophy className="mr-2 h-4 w-4" />
+            Leaderboard
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={() => router.push("/dashboard/achievements")}
+          >
+            <Star className="mr-2 h-4 w-4" />
+            Achievements
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={() => router.push("/dashboard/activity")}
+          >
+            <History className="mr-2 h-4 w-4" />
+            Activity
+          </Button>
+        </nav>
+
+        <div className="mt-auto border-t border-white/10 pt-6">
+          <div className="flex items-center gap-3 mb-4">
+            <CodeAvatar user={session?.user} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{session?.user?.name}</p>
+              <p className="text-xs text-muted-foreground truncate">Level {stats.level}</p>
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full justify-start" 
+            onClick={() => signOut({ callbackUrl: "/login" })}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default function DashboardPage() {
@@ -707,92 +900,24 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background-start to-background-end">
-      {/* Sidebar */}
-      <div className="fixed top-0 left-0 w-64 h-screen border-r border-white/10 bg-black/60 backdrop-blur-xl z-10">
-        <div className="p-6 flex flex-col h-full">
-          <div className="flex items-center gap-3 mb-8">
-            <Code2 className="h-8 w-8 text-pink-500" />
-            <span className="text-xl font-bold pixel-font">CloutNest</span>
-          </div>
+      {/* Desktop Sidebar */}
+      <DesktopSidebar session={session} stats={stats} />
+      
+      {/* Mobile Nav */}
+      <MobileNav user={session?.user} level={stats.level} />
 
-          <div className="flex justify-center mb-8">
-            {/* Use the SimpleOrb fallback directly in case of errors */}
-            <div>
-              <ErrorBoundary>
-                <Suspense fallback={<SimpleOrb />}>
-                  <CodeOrb />
-                </Suspense>
-              </ErrorBoundary>
-            </div>
-          </div>
-
-          <nav className="space-y-2 flex-1">
-            <Button
-              variant="ghost"
-              className="w-full justify-start neon-button"
-            >
-              <BarChart className="mr-2 h-4 w-4" />
-              Dashboard
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start"
-              onClick={() => router.push("/dashboard/leaderboard")}
-            >
-              <Trophy className="mr-2 h-4 w-4" />
-              Leaderboard
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start"
-              onClick={() => router.push("/dashboard/achievements")}
-            >
-              <Star className="mr-2 h-4 w-4" />
-              Achievements
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start"
-              onClick={() => router.push("/dashboard/activity")}
-            >
-              <History className="mr-2 h-4 w-4" />
-              Activity
-            </Button>
-          </nav>
-
-          <div className="mt-auto border-t border-white/10 pt-6">
-            <div className="flex items-center gap-3 mb-4">
-              <CodeAvatar user={session?.user} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{session?.user?.name}</p>
-                <p className="text-xs text-muted-foreground truncate">Level {stats.level}</p>
-              </div>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full justify-start" 
-              onClick={() => signOut({ callbackUrl: "/login" })}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main content */}
-      <main className="pl-64">
-        <div className="p-8">
+      {/* Main content - adjusted for mobile layout */}
+      <main className="lg:pl-64">
+        <div className="p-4 sm:p-6 lg:p-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="grid gap-6"
+            className="grid gap-4 sm:gap-6"
           >
             {/* Header section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold pixel-font neon-glow">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold pixel-font neon-glow">
                   Welcome back, {session?.user?.name || "Coder"}!
                 </h1>
                 <p className="text-sm md:text-base text-muted-foreground">
@@ -800,7 +925,7 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 md:gap-3 mt-2 md:mt-0">
+              <div className="flex items-center gap-2 md:gap-3 mt-2 md:mt-0 w-full md:w-auto">
                 <Dialog open={isConnecting} onOpenChange={closeGitHubConnect}>
                   <DialogTrigger asChild>
                   </DialogTrigger>
@@ -819,7 +944,7 @@ export default function DashboardPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="bg-black/60 border-white/20 hover:bg-sky-900/30 transition-colors"
+                  className="bg-black/60 border-white/20 hover:bg-sky-900/30 transition-colors w-full md:w-auto"
                   onClick={() => {
                     // Create tweet text with user stats
                     const tweetText = `🚀 My coding stats on CloutNest:\n\n` +
@@ -829,7 +954,7 @@ export default function DashboardPage() {
                       `🔀 ${stats.pullRequests} Pull Requests\n` +
                       `🔥 ${stats.currentStreak || stats.streak || 0} Day Streak (Best: ${stats.bestStreak || 0})\n` +
                       `⭐ ${stats.stars || 0} Stars across ${stats.repos || 0} repos\n` +
-                      `📈 ${stats.codeImpact || 0} Code impact contributions\n` +
+                      `📈 ${stats.totalLinesChanged?.toLocaleString() || 0} Code impact contributions\n` +
                       `📅 ${stats.activeDays || 0} Active days past year\n` +
                       `👀 ${stats.prReviews || 0} Code reviews\n\n` +
                       `Track your GitHub stats at https://cloutnest.com with CloutNest`;
@@ -843,6 +968,7 @@ export default function DashboardPage() {
                 >
                   <Twitter className="mr-2 h-4 w-4 text-sky-400" />
                   <span className="hidden sm:inline">Share Stats</span>
+                  <span className="sm:hidden">Share</span>
                 </Button>
               </div>
             </div>
@@ -897,10 +1023,10 @@ export default function DashboardPage() {
 
             {/* Level progress */}
             <Card className="neon-border bg-black/60">
-              <CardHeader className="pb-2 px-4 md:px-6">
+              <CardHeader className="pb-2 px-3 sm:px-4 md:px-6">
                 <CardTitle className="text-sm">Level Progress</CardTitle>
               </CardHeader>
-              <CardContent className="px-4 md:px-6">
+              <CardContent className="px-3 sm:px-4 md:px-6">
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
                     <span>Level {stats.level}</span>
@@ -914,21 +1040,21 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Stats cards */}
+            {/* Stats cards - adjust for mobile */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
               <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                <CardHeader className="pb-1 px-2 sm:px-3 md:px-6 pt-2 sm:pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">Commits</CardTitle>
                   <CardDescription className="text-xs">Total code submissions</CardDescription>
                 </CardHeader>
-                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+                <CardContent className="px-2 sm:px-3 md:px-6 pb-2 sm:pb-3 md:pb-6">
                   <div className="flex items-center">
-                    <GitCommit className="h-6 w-6 md:h-8 md:w-8 text-green-500 mr-2 md:mr-3" />
-                    <div className="text-xl md:text-3xl font-bold">{stats.commits}</div>
+                    <GitCommit className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-green-500 mr-2 md:mr-3" />
+                    <div className="text-lg sm:text-xl md:text-3xl font-bold">{stats.commits}</div>
                   </div>
                 </CardContent>
-                <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
-                  <Badge variant="outline" className="neon-glow text-xs">
+                <CardFooter className="text-xs text-muted-foreground px-2 sm:px-3 md:px-6 pb-2 sm:pb-3 md:pb-6 pt-0">
+                  <Badge variant="outline" className="neon-glow text-xs max-w-full overflow-hidden text-ellipsis">
                     {stats.timeRange !== 'all' ? getTimeRangeLabel(stats.timeRange || 'all') : (
                       stats.commits > 0 ? `Last activity: ${new Date().toLocaleDateString()}` : "No activity yet"
                     )}
@@ -937,18 +1063,18 @@ export default function DashboardPage() {
               </Card>
 
               <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                <CardHeader className="pb-1 px-2 sm:px-3 md:px-6 pt-2 sm:pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">Pull Requests</CardTitle>
                   <CardDescription className="text-xs">Contributions & reviews</CardDescription>
                 </CardHeader>
-                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+                <CardContent className="px-2 sm:px-3 md:px-6 pb-2 sm:pb-3 md:pb-6">
                   <div className="flex items-center">
-                    <GitPullRequest className="h-6 w-6 md:h-8 md:w-8 text-purple-500 mr-2 md:mr-3" />
-                    <div className="text-xl md:text-3xl font-bold">{stats.pullRequests}</div>
+                    <GitPullRequest className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-purple-500 mr-2 md:mr-3" />
+                    <div className="text-lg sm:text-xl md:text-3xl font-bold">{stats.pullRequests}</div>
                   </div>
                 </CardContent>
-                <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
-                  <Badge variant="outline" className="neon-glow text-xs">
+                <CardFooter className="text-xs text-muted-foreground px-2 sm:px-3 md:px-6 pb-2 sm:pb-3 md:pb-6 pt-0">
+                  <Badge variant="outline" className="neon-glow text-xs max-w-full overflow-hidden text-ellipsis">
                     {stats.timeRange !== 'all' ? getTimeRangeLabel(stats.timeRange || 'all') : (
                       stats.pullRequests > 0 ? `${stats.pullRequests} total PRs` : "No PRs yet"
                     )}
@@ -957,57 +1083,57 @@ export default function DashboardPage() {
               </Card>
 
               <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                <CardHeader className="pb-1 px-2 sm:px-3 md:px-6 pt-2 sm:pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">Coding Streak</CardTitle>
                   <CardDescription className="text-xs">Consecutive days coding</CardDescription>
                 </CardHeader>
-                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+                <CardContent className="px-2 sm:px-3 md:px-6 pb-2 sm:pb-3 md:pb-6">
                   <div className="flex items-center">
-                    <Flame className="h-6 w-6 md:h-8 md:w-8 text-orange-500 mr-2 md:mr-3" />
-                    <div className="text-xl md:text-3xl font-bold">{stats.currentStreak || stats.streak || 0}</div>
+                    <Flame className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-orange-500 mr-2 md:mr-3" />
+                    <div className="text-lg sm:text-xl md:text-3xl font-bold">{stats.currentStreak || stats.streak || 0}</div>
                   </div>
                 </CardContent>
-                <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
-                  <Badge variant="outline" className="neon-glow text-xs">
+                <CardFooter className="text-xs text-muted-foreground px-2 sm:px-3 md:px-6 pb-2 sm:pb-3 md:pb-6 pt-0">
+                  <Badge variant="outline" className="neon-glow text-xs max-w-full overflow-hidden text-ellipsis">
                     {stats.longestStreak ? `Best: ${stats.longestStreak} days` : "Start a streak"}
                   </Badge>
                 </CardFooter>
               </Card>
 
               <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                <CardHeader className="pb-1 px-2 sm:px-3 md:px-6 pt-2 sm:pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">Stars</CardTitle>
                   <CardDescription className="text-xs">Repository stars received</CardDescription>
                 </CardHeader>
-                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+                <CardContent className="px-2 sm:px-3 md:px-6 pb-2 sm:pb-3 md:pb-6">
                   <div className="flex items-center">
-                    <Star className="h-6 w-6 md:h-8 md:w-8 text-yellow-500 mr-2 md:mr-3" />
-                    <div className="text-xl md:text-3xl font-bold">{stats.stars || 0}</div>
+                    <Star className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-yellow-500 mr-2 md:mr-3" />
+                    <div className="text-lg sm:text-xl md:text-3xl font-bold">{stats.stars || 0}</div>
                   </div>
                 </CardContent>
-                <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
-                  <Badge variant="outline" className="neon-glow text-xs">
+                <CardFooter className="text-xs text-muted-foreground px-2 sm:px-3 md:px-6 pb-2 sm:pb-3 md:pb-6 pt-0">
+                  <Badge variant="outline" className="neon-glow text-xs max-w-full overflow-hidden text-ellipsis">
                     {stats.repos ? `Across ${stats.repos} repos` : "No starred repos"}
                   </Badge>
                 </CardFooter>
               </Card>
             </div>
 
-            {/* Additional stats */}
+            {/* Additional stats - 1 column on mobile, 3 on desktop */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
               <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                <CardHeader className="pb-1 px-3 md:px-6 pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">Code Impact</CardTitle>
                   <CardDescription className="text-xs">Total contributions</CardDescription>
                 </CardHeader>
                 <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   <div className="flex items-center">
-                    <Code2 className="h-6 w-6 md:h-8 md:w-8 text-blue-500 mr-2 md:mr-3" />
-                    <div className="text-xl md:text-3xl font-bold">{stats.totalLinesChanged?.toLocaleString() || 0}</div>
+                    <Code2 className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-blue-500 mr-2 md:mr-3" />
+                    <div className="text-lg sm:text-xl md:text-3xl font-bold">{stats.totalLinesChanged?.toLocaleString() || 0}</div>
                   </div>
                 </CardContent>
                 <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
-                  <Badge variant="outline" className="neon-glow text-xs">
+                  <Badge variant="outline" className="neon-glow text-xs max-w-full overflow-hidden text-ellipsis">
                     {stats.totalRepositoriesImpacted 
                       ? `Across ${stats.totalRepositoriesImpacted} repos` 
                       : stats.repos 
@@ -1018,14 +1144,14 @@ export default function DashboardPage() {
               </Card>
 
               <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                <CardHeader className="pb-1 px-3 md:px-6 pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">Active Days</CardTitle>
                   <CardDescription className="text-xs">Days with activity</CardDescription>
                 </CardHeader>
                 <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   <div className="flex items-center">
-                    <Calendar className="h-6 w-6 md:h-8 md:w-8 text-violet-500 mr-2 md:mr-3" />
-                    <div className="text-xl md:text-3xl font-bold">{stats.activeDays || 0}</div>
+                    <Calendar className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-violet-500 mr-2 md:mr-3" />
+                    <div className="text-lg sm:text-xl md:text-3xl font-bold">{stats.activeDays || 0}</div>
                   </div>
                 </CardContent>
                 <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
@@ -1036,14 +1162,14 @@ export default function DashboardPage() {
               </Card>
 
               <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                <CardHeader className="pb-1 px-3 md:px-6 pt-3 md:pt-6">
                   <CardTitle className="text-sm md:text-base">PR Reviews</CardTitle>
                   <CardDescription className="text-xs">Reviews conducted</CardDescription>
                 </CardHeader>
                 <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   <div className="flex items-center">
-                    <GitBranch className="h-6 w-6 md:h-8 md:w-8 text-emerald-500 mr-2 md:mr-3" />
-                    <div className="text-xl md:text-3xl font-bold">{stats.reviews || 0}</div>
+                    <GitBranch className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-emerald-500 mr-2 md:mr-3" />
+                    <div className="text-lg sm:text-xl md:text-3xl font-bold">{stats.reviews || 0}</div>
                   </div>
                 </CardContent>
                 <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
@@ -1054,7 +1180,7 @@ export default function DashboardPage() {
               </Card>
             </div>
 
-            {/* Achievements */}
+            {/* Achievements - 1 column on small mobile, 2 on larger mobile, 4 on desktop */}
             <div className="mt-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg md:text-xl font-bold pixel-font">Recent Achievements</h2>
@@ -1068,11 +1194,11 @@ export default function DashboardPage() {
                 </Button>
               </div>
               
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
                 {achievements.length > 0 ? (
                   achievements.slice(0, 4).map((achievement) => (
                     <Card key={achievement.name} className="neon-border bg-black/60">
-                      <CardHeader className="py-3 px-3 md:p-4">
+                      <CardHeader className="py-2 sm:py-3 px-3 md:p-4">
                         <div className="flex items-center gap-2 md:gap-3">
                           <div className="w-8 h-8 md:w-10 md:h-10 bg-pink-500/20 rounded-full flex items-center justify-center">
                             {renderIcon(achievement.icon)}
@@ -1092,7 +1218,7 @@ export default function DashboardPage() {
                     </Card>
                   ))
                 ) : (
-                  <div className="col-span-4 text-center py-8 bg-black/40 rounded-lg border border-white/10">
+                  <div className="col-span-1 xs:col-span-2 sm:col-span-3 md:col-span-4 text-center py-8 bg-black/40 rounded-lg border border-white/10">
                     <p className="text-muted-foreground">Complete coding tasks to unlock achievements!</p>
                   </div>
                 )}
@@ -1120,11 +1246,11 @@ export default function DashboardPage() {
                       key={index} 
                       className="flex items-start gap-3 p-3 md:p-4 bg-black/40 rounded-lg border border-white/10"
                     >
-                      <div className="w-8 h-8 bg-pink-500/20 rounded-full flex items-center justify-center mt-1">
+                      <div className="w-8 h-8 bg-pink-500/20 rounded-full flex items-center justify-center mt-1 shrink-0">
                         <GitCommit className="h-4 w-4 text-pink-500" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{activity.title}</p>
+                        <p className="text-sm font-medium break-words">{activity.title}</p>
                         <p className="text-xs text-muted-foreground truncate">{activity.repo}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {activity.date ? new Date(activity.date).toLocaleDateString() : ""}
@@ -1135,7 +1261,7 @@ export default function DashboardPage() {
                           href={activity.url} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-blue-500 hover:text-blue-400 text-xs"
+                          className="text-blue-500 hover:text-blue-400 text-xs shrink-0"
                         >
                           View
                         </a>
@@ -1176,17 +1302,17 @@ export default function DashboardPage() {
                       {activities.length > 0 ? (
                         activities.map((activity, index) => (
                           <div key={index}>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-start sm:items-center gap-3">
                               {activity.type === 'commit' ? (
-                                <GitCommit className="h-5 w-5 text-green-500" />
+                                <GitCommit className="h-5 w-5 text-green-500 shrink-0 mt-1 sm:mt-0" />
                               ) : (
-                                <GitPullRequest className="h-5 w-5 text-purple-500" />
+                                <GitPullRequest className="h-5 w-5 text-purple-500 shrink-0 mt-1 sm:mt-0" />
                               )}
-                              <div>
-                                <p className="font-medium">
+                              <div className="overflow-hidden">
+                                <p className="font-medium text-sm sm:text-base break-words">
                                   {activity.type === 'commit' ? 'Commit' : 'PR'}: {activity.title}
                                 </p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-xs text-muted-foreground truncate">
                                   {activity.repo} • {new Date(activity.date).toLocaleString()}
                                 </p>
                               </div>
