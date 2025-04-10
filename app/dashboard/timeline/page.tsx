@@ -99,13 +99,20 @@ export default function TimelinePage() {
           const parsedData = JSON.parse(cachedData)
           if (parsedData.activities && Array.isArray(parsedData.activities)) {
             setActivities(parsedData.activities)
+            setLoading(false)
+          } else {
+            // Fetch activities if not in cache or invalid
+            refreshData()
           }
+        } else {
+          // No cached data, fetch fresh data
+          refreshData()
         }
       } catch (error) {
         console.error("Error loading cached activities:", error)
+        // Attempt to fetch fresh data on error
+        refreshData()
       }
-      
-      setLoading(false)
     }
   }, [])
   
@@ -119,9 +126,10 @@ export default function TimelinePage() {
   // Function to refresh data from the API
   const refreshData = async () => {
     setIsRefreshing(true)
+    setLoading(true)
     try {
       // Fetch fresh activities data
-      const activitiesResponse = await fetch(`/api/github/activities?timeRange=${timeRange}`)
+      const activitiesResponse = await fetch(`/api/github/activity?timeRange=${timeRange}`)
       const activitiesData = await activitiesResponse.json()
       
       if (activitiesResponse.ok && activitiesData.activities) {
@@ -129,23 +137,29 @@ export default function TimelinePage() {
         
         // Update localStorage with new data
         try {
-          const cachedData = localStorage.getItem("CloutNest_githubData")
+          let cachedData = localStorage.getItem("CloutNest_githubData")
+          let parsedData = {}
+          
           if (cachedData) {
-            const parsedData = JSON.parse(cachedData)
-            localStorage.setItem("CloutNest_githubData", JSON.stringify({
-              ...parsedData,
-              activities: activitiesData.activities,
-              timestamp: Date.now()
-            }))
+            parsedData = JSON.parse(cachedData)
           }
+          
+          localStorage.setItem("CloutNest_githubData", JSON.stringify({
+            ...parsedData,
+            activities: activitiesData.activities,
+            timestamp: Date.now()
+          }))
         } catch (error) {
           console.error("Error updating cached activities:", error)
         }
+      } else {
+        console.error("Failed to fetch activities data", activitiesData)
       }
     } catch (error) {
       console.error("Error refreshing activity data:", error)
     } finally {
       setIsRefreshing(false)
+      setLoading(false)
     }
   }
   

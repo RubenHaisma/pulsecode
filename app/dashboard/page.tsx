@@ -405,190 +405,6 @@ const DesktopSidebar = ({ session, stats }: { session: any, stats: Stats }) => {
   );
 };
 
-// Create a new component for the contributions timeline
-const ContributionsTimeline = ({ activities }: { activities: any[] }) => {
-  const router = useRouter();
-  
-  // Process the activity data to get counts by date
-  const processActivitiesForTimeline = () => {
-    const activityByDate = new Map<string, number>();
-    const activityByMonth = new Map<string, number>();
-    const activityByWeek = new Map<string, number>();
-    
-    // Track the earliest and latest dates for the range
-    let earliestDate: Date | null = null;
-    let latestDate: Date | null = null;
-    
-    // Sort activities by date
-    const sortedActivities = [...activities].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-    
-    // Extract timeline data
-    sortedActivities.forEach(activity => {
-      const date = new Date(activity.date);
-      const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // YYYY-MM
-      
-      // Get week number (roughly)
-      const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-      const dayOfYear = Math.floor((date.getTime() - firstDayOfYear.getTime()) / (24 * 60 * 60 * 1000));
-      const weekNum = Math.floor(dayOfYear / 7);
-      const weekKey = `${date.getFullYear()}-${weekNum.toString().padStart(2, '0')}`;
-      
-      // Update date count
-      activityByDate.set(dateKey, (activityByDate.get(dateKey) || 0) + 1);
-      
-      // Update month count
-      activityByMonth.set(monthKey, (activityByMonth.get(monthKey) || 0) + 1);
-      
-      // Update week count
-      activityByWeek.set(weekKey, (activityByWeek.get(weekKey) || 0) + 1);
-      
-      // Track date range
-      if (!earliestDate || date < earliestDate) {
-        earliestDate = date;
-      }
-      if (!latestDate || date > latestDate) {
-        latestDate = date;
-      }
-    });
-    
-    // Convert maps to arrays for easier rendering
-    const dailyData = Array.from(activityByDate.entries())
-      .map(([date, count]) => ({ date, count }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-    
-    const monthlyData = Array.from(activityByMonth.entries())
-      .map(([month, count]) => ({ month, count }))
-      .sort((a, b) => a.month.localeCompare(b.month));
-    
-    const weeklyData = Array.from(activityByWeek.entries())
-      .map(([week, count]) => ({ week, count }))
-      .sort((a, b) => a.week.localeCompare(b.week));
-    
-    return {
-      dailyData,
-      weeklyData,
-      monthlyData,
-      earliestDate,
-      latestDate,
-      maxDailyCount: Math.max(...(dailyData.length ? dailyData.map(d => d.count) : [0])),
-      maxWeeklyCount: Math.max(...(weeklyData.length ? weeklyData.map(w => w.count) : [0])),
-      maxMonthlyCount: Math.max(...(monthlyData.length ? monthlyData.map(m => m.count) : [0]))
-    };
-  };
-  
-  // Generate the timeline graph
-  const renderTimelineGraph = () => {
-    if (activities.length === 0) {
-      return (
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">No activity data available</p>
-        </div>
-      );
-    }
-    
-    const { monthlyData, maxMonthlyCount } = processActivitiesForTimeline();
-    
-    // Limit to last 12 months for preview
-    const recentMonths = monthlyData.slice(-12);
-    
-    return (
-      <div className="mt-2">
-        <div className="flex justify-between items-end h-[150px] gap-1 relative">
-          {recentMonths.map(({ month, count }) => {
-            // Calculate height percentage
-            const heightPercentage = Math.max(5, (count / maxMonthlyCount) * 100);
-            
-            // Extract year and month for display
-            const [year, monthNum] = month.split('-');
-            const monthDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
-            const monthName = monthDate.toLocaleString('default', { month: 'short' });
-            
-            // Calculate color intensity based on count
-            const intensity = Math.max(30, Math.min(80, (count / maxMonthlyCount) * 100));
-            
-            return (
-              <div key={month} className="flex flex-col items-center group">
-                <div className="relative flex-1 w-full flex flex-col justify-end">
-                  <div 
-                    className="w-full min-w-8 rounded-t-sm bg-gradient-to-t from-purple-500 to-pink-500 transition-all duration-300 hover:from-purple-400 hover:to-pink-400 group-hover:shadow-glow"
-                    style={{ 
-                      height: `${heightPercentage}%`,
-                      opacity: 0.6 + (count / maxMonthlyCount) * 0.4
-                    }}
-                  >
-                    <div className="absolute -top-7 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-black/80 border border-white/10 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                      <p className="font-medium">{count} contributions</p>
-                      <p className="text-xs text-center">{monthName} {year}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-1 text-xs truncate text-muted-foreground" style={{ fontSize: '0.65rem' }}>
-                  {monthName}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-  
-  const getMostActiveTime = () => {
-    if (activities.length === 0) return null;
-    
-    const { monthlyData } = processActivitiesForTimeline();
-    
-    // Find the month with the most activity
-    const mostActiveMonth = monthlyData.reduce((max, current) => 
-      current.count > max.count ? current : max, 
-      { month: '', count: 0 }
-    );
-    
-    if (mostActiveMonth.month) {
-      const [year, monthNum] = mostActiveMonth.month.split('-');
-      const monthDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
-      const monthName = monthDate.toLocaleString('default', { month: 'long' });
-      
-      return (
-        <div className="text-sm mt-2 mb-4 px-3 py-2 bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded border border-purple-500/20">
-          <span className="font-medium">Most active period:</span> {monthName} {year} with {mostActiveMonth.count} contributions
-        </div>
-      );
-    }
-    
-    return null;
-  };
-  
-  return (
-    <Card className="neon-border bg-black/60">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="text-lg">Coding Timeline</CardTitle>
-          <CardDescription>Your coding activity over time</CardDescription>
-        </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="bg-black/60 border-white/20 hover:bg-purple-900/30 transition-colors" 
-          onClick={() => router.push("/dashboard/timeline")}
-        >
-          <BarChart className="mr-2 h-4 w-4 text-purple-400" />
-          <span>Detailed View</span>
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {getMostActiveTime()}
-        <div className="mt-2">
-          {renderTimelineGraph()}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const [stats, setStats] = useState<Stats>({ 
@@ -870,7 +686,7 @@ export default function DashboardPage() {
         // Update loading phase for activity fetching
         setLoadingPhase("Fetching your recent activity");
         
-        // Fetch activities with the same time range
+        // Fetch activities for user history
         const activityResponse = await fetch(`/api/github/activity?timeRange=${selectedTimeRange}`);
         const activityData = await activityResponse.json();
         
@@ -967,7 +783,7 @@ export default function DashboardPage() {
           setAchievements(statsData.achievements);
         }
         
-        // Fetch activities for the timeline
+        // Fetch activities for user history
         const activityResponse = await fetch(`/api/github/activity?timeRange=${selectedTimeRange}`);
         const activityData = await activityResponse.json();
         
@@ -1258,9 +1074,6 @@ export default function DashboardPage() {
                       <span className="ml-1 text-amber-400">(Outdated)</span> : 
                       <span className="ml-1 text-green-400">(Up to date)</span>
                     }
-                    <span className="ml-2 text-xs text-blue-400 block sm:inline mt-1 sm:mt-0">
-                      (Data is loaded from database unless you click &quot;Refresh from GitHub&quot;)
-                    </span>
                   </>
                 ) : 'No data loaded yet'}
               </div>
@@ -1454,13 +1267,8 @@ export default function DashboardPage() {
               </Card>
             </div>
             
-            {/* Add the Contributions Timeline */}
-            <div className="mt-6">
-              <ContributionsTimeline activities={activities} />
-            </div>
-
             {/* Achievements - 1 column on small mobile, 2 on larger mobile, 4 on desktop */}
-            <div className="mt-4">
+            <div className="mt-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg md:text-xl font-bold pixel-font">Recent Achievements</h2>
                 <Button 
