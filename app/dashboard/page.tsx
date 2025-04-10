@@ -22,7 +22,6 @@ import {
   Github,
   History,
   LogOut,
-  Settings,
   Share,
   Star,
   Trophy,
@@ -590,15 +589,15 @@ export default function DashboardPage() {
   // New component to explain GitHub permissions
   const GitHubPermissionsInfo = () => (
     <div className="mt-4 p-4 bg-muted rounded-lg text-sm">
-      <h4 className="font-semibold mb-2">Why we need these GitHub permissions:</h4>
+      <h4 className="font-semibold mb-2">GitHub Permissions - Read-Only Access:</h4>
       <ul className="list-disc pl-5 space-y-1">
         <li><span className="font-medium">read:user, user:email</span> - To identify you and access your public profile</li>
-        <li><span className="font-medium">repo</span> - To access all your repositories, including private ones (if any)</li>
-        <li><span className="font-medium">read:org</span> - To discover repositories in organizations you contribute to</li>
-        <li><span className="font-medium">read:project</span> - To find all projects you&apos;ve worked on</li>
+        <li><span className="font-medium">public_repo</span> - To read your public repositories only</li>
+        <li><span className="font-medium">read:org</span> - To discover public repositories in organizations you contribute to</li>
+        <li><span className="font-medium">read:project</span> - To find public projects you&apos;ve worked on</li>
       </ul>
       <p className="mt-2 text-xs text-muted-foreground">
-        We only use these permissions to calculate your coding stats. We never modify your repositories or make changes on your behalf.
+        We only request read-only access to calculate your coding stats. We never modify your repositories or make any changes on your behalf.
       </p>
     </div>
   );
@@ -781,15 +780,18 @@ export default function DashboardPage() {
             {/* Header section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
-                <h1 className="text-3xl font-bold pixel-font neon-glow">
+                <h1 className="text-2xl md:text-3xl font-bold pixel-font neon-glow">
                   Welcome back, {session?.user?.name || "Coder"}!
                 </h1>
-                <p className="text-muted-foreground">
+                <p className="text-sm md:text-base text-muted-foreground">
                   Level {stats.level} Coder · {stats.points} XP
+                </p>
+                <p className="text-xs text-blue-400 mt-1">
+                  Note: CloutNest only tracks your public repositories to protect your privacy
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 md:gap-3 mt-2 md:mt-0">
                 <Dialog open={isConnecting} onOpenChange={closeGitHubConnect}>
                   <DialogTrigger asChild>
                   </DialogTrigger>
@@ -826,14 +828,14 @@ export default function DashboardPage() {
                   }}
                 >
                   <Twitter className="mr-2 h-4 w-4 text-sky-400" />
-                  Share Stats
+                  <span className="hidden sm:inline">Share Stats</span>
                 </Button>
               </div>
             </div>
 
             {/* Time range selector and refresh button */}
-            <div className="flex justify-between items-center">
-              <div className="text-xs text-muted-foreground">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+              <div className="text-xs text-muted-foreground w-full sm:w-auto mb-2 sm:mb-0">
                 {dataLastUpdated ? (
                   <>
                     <span>Last updated: </span>
@@ -842,18 +844,22 @@ export default function DashboardPage() {
                       <span className="ml-1 text-amber-400">(Outdated)</span> : 
                       <span className="ml-1 text-green-400">(Up to date)</span>
                     }
+                    <span className="ml-2 text-xs text-blue-400 block sm:inline mt-1 sm:mt-0">
+                      (Data is loaded from database unless you click &quot;Refresh from GitHub&quot;)
+                    </span>
                   </>
                 ) : 'No data loaded yet'}
               </div>
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap sm:flex-nowrap gap-2 sm:space-x-2 w-full sm:w-auto">
                 <TimeRangeSelector 
                   value={timeRange} 
-                  onChange={handleTimeRangeChange} 
+                  onChange={handleTimeRangeChange}
+                  className="w-full sm:w-auto"
                 />
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="bg-black/60 border-white/20" 
+                  className="bg-black/60 border-white/20 w-full sm:w-auto" 
                   onClick={refreshStats}
                   disabled={isRefreshing}
                   title="Fetch fresh data from GitHub API (otherwise data is loaded from our database)"
@@ -861,12 +867,14 @@ export default function DashboardPage() {
                   {isRefreshing ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      <span>Refreshing from GitHub...</span>
+                      <span className="hidden sm:inline">Refreshing from GitHub...</span>
+                      <span className="sm:hidden inline">Refreshing...</span>
                     </>
                   ) : (
                     <>
                       <Github className="mr-2 h-4 w-4" />
-                      <span>Refresh from GitHub</span>
+                      <span className="hidden sm:inline">Refresh from GitHub</span>
+                      <span className="sm:hidden inline">Refresh</span>
                     </>
                   )}
                 </Button>
@@ -875,10 +883,10 @@ export default function DashboardPage() {
 
             {/* Level progress */}
             <Card className="neon-border bg-black/60">
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 px-4 md:px-6">
                 <CardTitle className="text-sm">Level Progress</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 md:px-6">
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
                     <span>Level {stats.level}</span>
@@ -893,20 +901,20 @@ export default function DashboardPage() {
             </Card>
 
             {/* Stats cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
               <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-2">
-                  <CardTitle>Commits</CardTitle>
-                  <CardDescription>Total code submissions</CardDescription>
+                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                  <CardTitle className="text-sm md:text-base">Commits</CardTitle>
+                  <CardDescription className="text-xs">Public repository activity</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   <div className="flex items-center">
-                    <GitCommit className="h-8 w-8 text-green-500 mr-3" />
-                    <div className="text-3xl font-bold">{stats.commits}</div>
+                    <GitCommit className="h-6 w-6 md:h-8 md:w-8 text-green-500 mr-2 md:mr-3" />
+                    <div className="text-xl md:text-3xl font-bold">{stats.commits}</div>
                   </div>
                 </CardContent>
-                <CardFooter className="text-xs text-muted-foreground">
-                  <Badge variant="outline" className="neon-glow">
+                <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
+                  <Badge variant="outline" className="neon-glow text-xs">
                     {stats.timeRange !== 'all' ? getTimeRangeLabel(stats.timeRange || 'all') : (
                       stats.commits > 0 ? `Last activity: ${new Date().toLocaleDateString()}` : "No activity yet"
                     )}
@@ -915,18 +923,18 @@ export default function DashboardPage() {
               </Card>
 
               <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-2">
-                  <CardTitle>Pull Requests</CardTitle>
-                  <CardDescription>Contributions & reviews</CardDescription>
+                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                  <CardTitle className="text-sm md:text-base">Pull Requests</CardTitle>
+                  <CardDescription className="text-xs">Public repo contributions</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   <div className="flex items-center">
-                    <GitPullRequest className="h-8 w-8 text-purple-500 mr-3" />
-                    <div className="text-3xl font-bold">{stats.pullRequests}</div>
+                    <GitPullRequest className="h-6 w-6 md:h-8 md:w-8 text-purple-500 mr-2 md:mr-3" />
+                    <div className="text-xl md:text-3xl font-bold">{stats.pullRequests}</div>
                   </div>
                 </CardContent>
-                <CardFooter className="text-xs text-muted-foreground">
-                  <Badge variant="outline" className="neon-glow">
+                <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
+                  <Badge variant="outline" className="neon-glow text-xs">
                     {stats.timeRange !== 'all' ? getTimeRangeLabel(stats.timeRange || 'all') : (
                       stats.pullRequests > 0 ? `${stats.pullRequests} total PRs` : "No PRs yet"
                     )}
@@ -935,131 +943,197 @@ export default function DashboardPage() {
               </Card>
 
               <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Coding Streak</CardTitle>
-                  <CardDescription>Days of consistency</CardDescription>
+                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                  <CardTitle className="text-sm md:text-base">Coding Streak</CardTitle>
+                  <CardDescription className="text-xs">Public commit frequency</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-baseline justify-between">
-                    <div className="text-3xl font-bold">{stats.currentStreak || stats.streak || 0}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {stats.longestStreak ? `Best: ${stats.longestStreak}` : ''}
+                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+                  <div className="flex items-center">
+                    <Flame className="h-6 w-6 md:h-8 md:w-8 text-orange-500 mr-2 md:mr-3" />
+                    <div className="text-xl md:text-3xl font-bold">{stats.currentStreak || stats.streak || 0}</div>
+                  </div>
+                </CardContent>
+                <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
+                  <Badge variant="outline" className="neon-glow text-xs">
+                    {stats.longestStreak ? `Best: ${stats.longestStreak} days` : "Start a streak"}
+                  </Badge>
+                </CardFooter>
+              </Card>
+
+              <Card className="neon-border bg-black/60">
+                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                  <CardTitle className="text-sm md:text-base">Stars</CardTitle>
+                  <CardDescription className="text-xs">Public repo stars</CardDescription>
+                </CardHeader>
+                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+                  <div className="flex items-center">
+                    <Star className="h-6 w-6 md:h-8 md:w-8 text-yellow-500 mr-2 md:mr-3" />
+                    <div className="text-xl md:text-3xl font-bold">{stats.stars || 0}</div>
+                  </div>
+                </CardContent>
+                <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
+                  <Badge variant="outline" className="neon-glow text-xs">
+                    {stats.repos ? `Across ${stats.repos} repos` : "No starred repos"}
+                  </Badge>
+                </CardFooter>
+              </Card>
+            </div>
+
+            {/* Additional stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
+              <Card className="neon-border bg-black/60">
+                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                  <CardTitle className="text-sm md:text-base">Code Impact</CardTitle>
+                  <CardDescription className="text-xs">Public repo contributions</CardDescription>
+                </CardHeader>
+                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+                  <div className="flex items-center">
+                    <Code2 className="h-6 w-6 md:h-8 md:w-8 text-blue-500 mr-2 md:mr-3" />
+                    <div className="text-xl md:text-3xl font-bold">{stats.totalLinesChanged?.toLocaleString() || 0}</div>
+                  </div>
+                </CardContent>
+                <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
+                  <Badge variant="outline" className="neon-glow text-xs">
+                    {stats.totalRepositoriesImpacted 
+                      ? `Across ${stats.totalRepositoriesImpacted} repos` 
+                      : stats.repos 
+                        ? `Across ${stats.repos} repos` 
+                        : "No code yet"}
+                  </Badge>
+                </CardFooter>
+              </Card>
+
+              <Card className="neon-border bg-black/60">
+                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                  <CardTitle className="text-sm md:text-base">Active Days</CardTitle>
+                  <CardDescription className="text-xs">Public activity days</CardDescription>
+                </CardHeader>
+                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+                  <div className="flex items-center">
+                    <Calendar className="h-6 w-6 md:h-8 md:w-8 text-violet-500 mr-2 md:mr-3" />
+                    <div className="text-xl md:text-3xl font-bold">{stats.activeDays || 0}</div>
+                  </div>
+                </CardContent>
+                <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
+                  <Badge variant="outline" className="neon-glow text-xs">
+                    Past year
+                  </Badge>
+                </CardFooter>
+              </Card>
+
+              <Card className="neon-border bg-black/60">
+                <CardHeader className="pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+                  <CardTitle className="text-sm md:text-base">PR Reviews</CardTitle>
+                  <CardDescription className="text-xs">Public PR reviews</CardDescription>
+                </CardHeader>
+                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+                  <div className="flex items-center">
+                    <GitBranch className="h-6 w-6 md:h-8 md:w-8 text-emerald-500 mr-2 md:mr-3" />
+                    <div className="text-xl md:text-3xl font-bold">{stats.reviews || 0}</div>
+                  </div>
+                </CardContent>
+                <CardFooter className="text-xs text-muted-foreground px-3 md:px-6 pb-3 md:pb-6 pt-0">
+                  <Badge variant="outline" className="neon-glow text-xs">
+                    {stats.reviews ? "Code reviews" : "No reviews yet"}
+                  </Badge>
+                </CardFooter>
+              </Card>
+            </div>
+
+            {/* Achievements */}
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg md:text-xl font-bold pixel-font">Recent Achievements</h2>
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="text-muted-foreground"
+                  onClick={() => router.push("/dashboard/achievements")}
+                >
+                  View all
+                </Button>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                {achievements.length > 0 ? (
+                  achievements.slice(0, 4).map((achievement) => (
+                    <Card key={achievement.name} className="neon-border bg-black/60">
+                      <CardHeader className="py-3 px-3 md:p-4">
+                        <div className="flex items-center gap-2 md:gap-3">
+                          <div className="w-8 h-8 md:w-10 md:h-10 bg-pink-500/20 rounded-full flex items-center justify-center">
+                            {renderIcon(achievement.icon)}
+                          </div>
+                          <div>
+                            <CardTitle className="text-sm md:text-base">{achievement.name}</CardTitle>
+                            <CardDescription className="text-xs">{achievement.description}</CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardFooter className="py-2 px-3 md:px-4 border-t border-white/10 flex justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(achievement.unlockedAt).toLocaleDateString()}
+                        </span>
+                        <Badge variant="outline" className="text-xs">+{achievement.points} XP</Badge>
+                      </CardFooter>
+                    </Card>
+                  ))
+                ) : (
+                  <div className="col-span-4 text-center py-8 bg-black/40 rounded-lg border border-white/10">
+                    <p className="text-muted-foreground">Complete coding tasks to unlock achievements!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg md:text-xl font-bold pixel-font">Recent Activity</h2>
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="text-muted-foreground"
+                  onClick={() => router.push("/dashboard/activity")}
+                >
+                  View all
+                </Button>
+              </div>
+              
+              <div className="space-y-3">
+                {activities.length > 0 ? (
+                  activities.slice(0, 3).map((activity, index) => (
+                    <div 
+                      key={index} 
+                      className="flex items-start gap-3 p-3 md:p-4 bg-black/40 rounded-lg border border-white/10"
+                    >
+                      <div className="w-8 h-8 bg-pink-500/20 rounded-full flex items-center justify-center mt-1">
+                        <GitCommit className="h-4 w-4 text-pink-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{activity.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">{activity.repo}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {activity.date ? new Date(activity.date).toLocaleDateString() : ""}
+                        </p>
+                      </div>
+                      {activity.url && (
+                        <a 
+                          href={activity.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-500 hover:text-blue-400 text-xs"
+                        >
+                          View
+                        </a>
+                      )}
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 bg-black/40 rounded-lg border border-white/10">
+                    <p className="text-muted-foreground">No recent activity</p>
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Current streak
-                  </div>
-                  {stats.activeDays ? (
-                    <div className="mt-4 text-sm">
-                      <span className="font-medium">{stats.activeDays}</span> active days in past year
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-
-              <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Code Impact</CardTitle>
-                  <CardDescription>Total contributions</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">
-                    {stats.totalLinesChanged ? 
-                      (stats.totalLinesChanged > 1000 
-                        ? `${(stats.totalLinesChanged / 1000).toFixed(1)}k` 
-                        : stats.totalLinesChanged.toLocaleString()) 
-                      : '0'}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Lines of code changed
-                  </div>
-                  {stats.repos ? (
-                    <div className="mt-4 text-sm">
-                      Across <span className="font-medium">{stats.totalRepositoriesImpacted || stats.repos}</span> repositories
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-
-              <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-2">
-                  <CardTitle>GitHub Activity</CardTitle>
-                  <CardDescription>Commits, PRs & Reviews</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center">
-                    <Github className="h-8 w-8 text-gray-500 mr-3" />
-                    <div className="text-3xl font-bold">{stats.contributions || 0}</div>
-                  </div>
-                </CardContent>
-                <CardFooter className="text-xs text-muted-foreground">
-                  <Badge variant="outline" className="neon-glow">
-                    {stats.timeRange !== 'all' ? getTimeRangeLabel(stats.timeRange || 'all') : (
-                      stats.contributions ? `Total GitHub interactions` : "No activity yet"
-                    )}
-                  </Badge>
-                </CardFooter>
-              </Card>
-
-              <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-2">
-                  <CardTitle>Reviews</CardTitle>
-                  <CardDescription>Pull request reviews</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center">
-                    <GitPullRequest className="h-8 w-8 text-indigo-500 mr-3" />
-                    <div className="text-3xl font-bold">{stats.reviews || 0}</div>
-                  </div>
-                </CardContent>
-                <CardFooter className="text-xs text-muted-foreground">
-                  <Badge variant="outline" className="neon-glow">
-                    {stats.timeRange !== 'all' ? getTimeRangeLabel(stats.timeRange || 'all') : (
-                      stats.reviews ? `Code reviews completed` : "No reviews yet"
-                    )}
-                  </Badge>
-                </CardFooter>
-              </Card>
-
-              <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-2">
-                  <CardTitle>Repositories</CardTitle>
-                  <CardDescription>Public & private repos</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center">
-                    <GitBranch className="h-8 w-8 text-yellow-500 mr-3" />
-                    <div className="text-3xl font-bold">{stats.repos || 0}</div>
-                  </div>
-                </CardContent>
-                <CardFooter className="text-xs text-muted-foreground">
-                  <Badge variant="outline" className="neon-glow">
-                    {stats.timeRange !== 'all' ? getTimeRangeLabel(stats.timeRange || 'all') : (
-                      stats.repos ? `${stats.publicRepos || 0} public, ${stats.privateRepos || 0} private` : "No repositories yet"
-                    )}
-                  </Badge>
-                </CardFooter>
-              </Card>
-
-              <Card className="neon-border bg-black/60">
-                <CardHeader className="pb-2">
-                  <CardTitle>Stars</CardTitle>
-                  <CardDescription>Repository stars</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center">
-                    <Star className="h-8 w-8 text-yellow-400 mr-3" />
-                    <div className="text-3xl font-bold">{stats.stars || 0}</div>
-                  </div>
-                </CardContent>
-                <CardFooter className="text-xs text-muted-foreground">
-                  <Badge variant="outline" className="neon-glow">
-                    {stats.timeRange !== 'all' ? getTimeRangeLabel(stats.timeRange || 'all') : (
-                      stats.stars ? `Stars received` : "No stars yet"
-                    )}
-                  </Badge>
-                </CardFooter>
-              </Card>
+                )}
+              </div>
             </div>
 
             {/* Tabs for activity and achievements */}

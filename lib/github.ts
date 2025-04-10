@@ -12,10 +12,9 @@ const headers = {
 export const requiredGitHubScopes = [
   "read:user", 
   "user:email", 
-  "repo", 
+  "public_repo", 
   "read:org",
-  "read:project", 
-  "admin:org_hook"
+  "read:project"
 ];
 
 // Create a function to get an Octokit instance with the user's token
@@ -971,279 +970,43 @@ async function discoverUserRepositories(
   githubUsername: string,
   organizationNames: string[] = []
 ): Promise<any[]> {
-  const allRepos = new Map<string, any>();
-  
-  console.log(`Starting repository discovery for user ${githubUsername}`);
+  console.log(`Discovering repositories for user ${githubUsername} and organizations: ${organizationNames.join(', ') || 'none'}`);
   
   try {
-    // First get authenticated user's repositories
-    try {
-      const { data: authRepos } = await withRateLimit(() => 
-        octokit.repos.listForAuthenticatedUser({
-          per_page: 100, 
-          sort: "updated",
-          headers
-        })
-      );
-      
-      // Add repos to map, using full_name as key to avoid duplicates
-      authRepos.forEach(repo => {
-        allRepos.set(repo.full_name, repo);
-      });
-      
-      console.log(`Found ${authRepos.length} repositories for authenticated user`);
-    } catch (error) {
-      console.error("Error fetching authenticated repositories:", error);
-    }
-
-    // Get repositories where user is listed as contributor
-    try {
-      const { data: userRepos } = await withRateLimit(() => 
-        octokit.repos.listForUser({
-          username: githubUsername,
-          type: "all",
-          sort: "updated",
-          per_page: 100,
-          headers
-        })
-      );
-      
-      userRepos.forEach(repo => {
-        allRepos.set(repo.full_name, repo);
-      });
-      
-      console.log(`Found ${userRepos.length} repositories for user ${githubUsername}`);
-      } catch (error) {
-      console.error(`Error fetching user repositories for ${githubUsername}:`, error);
-    }
+    const allRepos: any[] = [];
     
-    // Get repos from organizations
-    for (const orgName of organizationNames) {
-      try {
-        // Get all repos for this organization
-        const orgRepos = await fetchAllOrgRepositories(octokit, orgName);
-        
-        orgRepos.forEach(repo => {
-          allRepos.set(repo.full_name, repo);
-        });
-        
-        console.log(`Added ${orgRepos.length} repositories from organization ${orgName}`);
-      } catch (error) {
-        console.error(`Error fetching repos for organization ${orgName}:`, error);
-      }
-    }
+    // Get user's repositories (these will be public repositories only with public_repo scope)
+    const userRepos = await fetchUserRepositories(octokit, githubUsername);
+    allRepos.push(...userRepos);
     
-    // Find repositories via search API using multiple search strategies
-    try {
-      // Search strategies to find all possible repositories
-      const searchStrategies = [
-        `user:${githubUsername}`, // User's own repos
-        `org:${organizationNames.join(' org:')}`, // All org repos
-        `involves:${githubUsername}`, // PRs, issues, comments
-        `author:${githubUsername}`, // Commits
-        `committer:${githubUsername}` // Commits
-      ];
+    // Get repositories from user's organizations if provided
+    if (organizationNames.length > 0) {
+      console.log(`Fetching repositories for ${organizationNames.length} organizations`);
       
-      for (const query of searchStrategies) {
-        if (!query || query.endsWith(':')) continue; // Skip empty queries
-        
+      for (const orgName of organizationNames) {
         try {
-          const { data: searchResults } = await withRateLimit(() => 
-            octokit.search.repos({
-              q: query,
-              sort: "updated",
-              per_page: 100,
-              headers
-            })
-          );
+          // Note: With only public_repo scope, we'll only get public organization repositories
+          const orgRepos = await fetchAllOrgRepositories(octokit, orgName);
           
-          if (searchResults.items) {
-            searchResults.items.forEach(repo => {
-              allRepos.set(repo.full_name, repo);
-            });
-            
-            console.log(`Found ${searchResults.items.length} repositories with query "${query}"`);
-          }
-        } catch (searchError) {
-          console.error(`Error searching repos with query "${query}":`, searchError);
+          // Filter to include only repos where the user might be a contributor
+          // This is a preliminary filter - we'll check actual contributions later
+          allRepos.push(...orgRepos);
+          
+          console.log(`Found ${orgRepos.length} repositories for organization ${orgName}`);
+        } catch (error: any) {
+          // Log error but continue with other organizations
+          console.error(`Error fetching repos for org ${orgName}:`, error.message);
         }
       }
-    } catch (error) {
-      console.error("Error during repository search:", error);
     }
     
-    // Use GraphQL API to get repositories user has contributed to
-    try {
-      // This requires the 'repo' scope to access private repos
-      const query = `
-        query($username: String!) {
-          user(login: $username) {
-            contributionsCollection {
-              commitContributionsByRepository(maxRepositories: 100) {
-                repository {
-                  nameWithOwner
-                  name
-                  owner {
-                    login
-                    __typename
-                  }
-                  isPrivate
-                  url
-                }
-              }
-              pullRequestContributionsByRepository(maxRepositories: 100) {
-                repository {
-                  nameWithOwner
-                  name
-                  owner {
-                    login
-                    __typename
-                  }
-                  isPrivate
-                  url
-                }
-              }
-              issueContributionsByRepository(maxRepositories: 100) {
-                repository {
-                  nameWithOwner
-                  name
-                  owner {
-                    login
-                    __typename
-                  }
-                  isPrivate
-                  url
-                }
-              }
-            }
-          }
-        }
-      `;
-      
-      // Add timeout to prevent hanging on GraphQL queries
-      const graphqlPromise = octokit.graphql(query, { username: githubUsername });
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("GraphQL query timeout")), 30000); // 30 second timeout
-      });
-      
-      // Use race to implement timeout
-      const result: any = await Promise.race([graphqlPromise, timeoutPromise]);
-      
-      if (result && result.user && result.user.contributionsCollection) {
-        const { commitContributionsByRepository, pullRequestContributionsByRepository, issueContributionsByRepository } = 
-          result.user.contributionsCollection;
-          
-        // Process commit contributions
-        if (commitContributionsByRepository) {
-          for (const { repository } of commitContributionsByRepository) {
-            // Convert GraphQL result to REST API format
-            if (repository && repository.nameWithOwner) {
-              if (!allRepos.has(repository.nameWithOwner)) {
-                // Fetch full repo info
-                try {
-                  const [owner, name] = repository.nameWithOwner.split('/');
-                  const { data: repoData } = await withRateLimit(() => 
-                    octokit.repos.get({
-                      owner,
-                      repo: name,
-                      headers
-                    })
-                  );
-                  
-                  allRepos.set(repository.nameWithOwner, repoData);
-                } catch (repoError) {
-                  // Just store the basic info we have
-                  allRepos.set(repository.nameWithOwner, {
-                    name: repository.name,
-                    full_name: repository.nameWithOwner,
-                    owner: {
-                      login: repository.owner.login,
-                      type: repository.owner.__typename
-                    },
-                    private: repository.isPrivate,
-                    html_url: repository.url
-                  });
-                }
-              }
-            }
-          }
-        }
-        
-        // Process PR contributions
-        if (pullRequestContributionsByRepository) {
-          for (const { repository } of pullRequestContributionsByRepository) {
-            if (repository && repository.nameWithOwner && !allRepos.has(repository.nameWithOwner)) {
-              // Convert GraphQL to REST format
-              try {
-                const [owner, name] = repository.nameWithOwner.split('/');
-                const { data: repoData } = await withRateLimit(() => 
-                  octokit.repos.get({
-                    owner,
-                    repo: name,
-                    headers
-                  })
-                );
-                
-                allRepos.set(repository.nameWithOwner, repoData);
-              } catch (repoError) {
-                // Store basic info
-                allRepos.set(repository.nameWithOwner, {
-                  name: repository.name,
-                  full_name: repository.nameWithOwner,
-                  owner: {
-                    login: repository.owner.login,
-                    type: repository.owner.__typename
-                  },
-                  private: repository.isPrivate,
-                  html_url: repository.url
-                });
-              }
-            }
-          }
-        }
-        
-        // Process issue contributions
-        if (issueContributionsByRepository) {
-          for (const { repository } of issueContributionsByRepository) {
-            if (repository && repository.nameWithOwner && !allRepos.has(repository.nameWithOwner)) {
-              // Convert GraphQL to REST format
-              try {
-                const [owner, name] = repository.nameWithOwner.split('/');
-                const { data: repoData } = await withRateLimit(() => 
-                  octokit.repos.get({
-                    owner,
-                    repo: name,
-                    headers
-                  })
-                );
-                
-                allRepos.set(repository.nameWithOwner, repoData);
-              } catch (repoError) {
-                // Store basic info
-                allRepos.set(repository.nameWithOwner, {
-                  name: repository.name,
-                  full_name: repository.nameWithOwner,
-                  owner: {
-                    login: repository.owner.login,
-                    type: repository.owner.__typename
-                  },
-                  private: repository.isPrivate,
-                  html_url: repository.url
-                });
-              }
-            }
-          }
-        }
-        
-        console.log(`Found additional ${allRepos.size} repositories via GraphQL contributions query`);
-      }
-    } catch (graphqlError) {
-      console.error("Error fetching repository contributions via GraphQL:", graphqlError);
-    }
+    console.log(`Total repositories discovered: ${allRepos.length}`);
     
-    // Return all discovered repositories as array
-    return Array.from(allRepos.values());
-  } catch (error) {
+    // Add a note about public-only access
+    console.log(`Note: With public_repo scope, only public repositories are accessible`);
+    
+    return allRepos;
+  } catch (error: any) {
     console.error("Error discovering repositories:", error);
     return [];
   }
@@ -2014,9 +1777,9 @@ export async function getGitHubActivity(
         console.log("Using standard user repos for activity");
         const { data: userRepos } = await octokit.repos.listForUser({
           username: githubUsername,
+          type: "all", // Fetching all repos, we'll only get access to public ones with public_repo scope
           sort: "updated",
           per_page: 20,
-          type: "all",
           headers
         });
         repos = userRepos;
@@ -2026,9 +1789,9 @@ export async function getGitHubActivity(
       // Fall back to the standard method
       const { data: userRepos } = await octokit.repos.listForUser({
         username: githubUsername,
+        type: "all", // Fetching all repos, we'll only get access to public ones with public_repo scope
         sort: "updated",
         per_page: 20,
-        type: "all", 
         headers
       });
       repos = userRepos;
@@ -2245,5 +2008,47 @@ export async function updateGitHubUserData(
   } catch (error) {
     console.error("Error updating GitHub user data:", error);
     throw error;
+  }
+}
+
+/**
+ * Fetch a user's public repositories
+ */
+async function fetchUserRepositories(
+  octokit: Octokit,
+  username: string
+): Promise<any[]> {
+  const repos: any[] = [];
+  let page = 1;
+  const perPage = 100;
+  let hasMorePages = true;
+
+  try {
+    while (hasMorePages) {
+      const { data } = await withRateLimit(() => 
+        octokit.repos.listForUser({
+          username: username,
+          type: "all", // Fetching all repos, we'll only get access to public ones with public_repo scope
+          sort: "updated",
+          per_page: perPage,
+          page: page,
+          headers
+        })
+      );
+
+      repos.push(...data);
+      
+      if (data.length < perPage) {
+        hasMorePages = false;
+      } else {
+        page++;
+      }
+    }
+
+    console.log(`Found ${repos.length} public repositories for user ${username}`);
+    return repos;
+  } catch (error) {
+    console.error(`Error fetching public repositories for ${username}:`, error);
+    return [];
   }
 } 
