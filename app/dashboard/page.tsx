@@ -86,6 +86,10 @@ export interface Stats {
   longestStreak?: number;
   activeDays?: number;
   totalRepositoriesImpacted?: number;
+  codeSubmissions?: number;
+  bestStreak?: number;
+  codeImpact?: number;
+  prReviews?: number;
 }
 
 // Mock achievement data
@@ -455,6 +459,10 @@ export default function DashboardPage() {
           longestStreak: statsData.stats.longestStreak || 0,
           activeDays: statsData.stats.activeDays || 0,
           totalRepositoriesImpacted: statsData.stats.totalRepositoriesImpacted || 0,
+          codeSubmissions: statsData.stats.codeSubmissions || 0,
+          bestStreak: statsData.stats.bestStreak || 0,
+          codeImpact: statsData.stats.codeImpact || 0,
+          prReviews: statsData.stats.prReviews || 0,
         });
       }
       
@@ -505,6 +513,10 @@ export default function DashboardPage() {
             longestStreak: statsData.stats?.longestStreak || 0,
             activeDays: statsData.stats?.activeDays || 0,
             totalRepositoriesImpacted: statsData.stats?.totalRepositoriesImpacted || 0,
+            codeSubmissions: statsData.stats?.codeSubmissions || 0,
+            bestStreak: statsData.stats?.bestStreak || 0,
+            codeImpact: statsData.stats?.codeImpact || 0,
+            prReviews: statsData.stats?.prReviews || 0,
           },
           achievements: statsData.achievements || [],
           activities: activityData.activities || [],
@@ -813,8 +825,13 @@ export default function DashboardPage() {
                     const tweetText = `🚀 My coding stats on CloutNest:\n\n` +
                       `✨ Level ${stats.level} Coder\n` +
                       `📊 ${stats.commits} Commits\n` +
+                      `💻 ${stats.codeSubmissions || 0} Total code submissions\n` +
                       `🔀 ${stats.pullRequests} Pull Requests\n` +
-                      `🔥 ${stats.currentStreak || stats.streak || 0} Day Streak\n\n` +
+                      `🔥 ${stats.currentStreak || stats.streak || 0} Day Streak (Best: ${stats.bestStreak || 0})\n` +
+                      `⭐ ${stats.stars || 0} Stars across ${stats.repos || 0} repos\n` +
+                      `📈 ${stats.codeImpact || 0} Code impact contributions\n` +
+                      `📅 ${stats.activeDays || 0} Active days past year\n` +
+                      `👀 ${stats.prReviews || 0} Code reviews\n\n` +
                       `Track your GitHub stats at https://cloutnest.com with CloutNest`;
                     
                     // URL encode the tweet text
