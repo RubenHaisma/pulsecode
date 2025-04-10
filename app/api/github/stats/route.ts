@@ -46,89 +46,47 @@ export async function GET(req: Request) {
       }, { status: 200 });
     }
 
-    // Check if this is first load or data needs refresh
-    const isFirstLoad = !userData.stats || !userData.stats.lastActivity;
-    const isDataStale = userData.stats?.lastActivity && 
-      Date.now() - new Date(userData.stats.lastActivity).getTime() > 3600000; // 1 hour
-    
-    // Always refresh data if it's first load, force refreshed, or stale
-    const shouldRefreshData = isFirstLoad || forceRefresh || isDataStale || timeRange !== 'all';
+    // Check if this is first load (no stats yet)
+    const isFirstLoad = !userData.stats;
 
-    try {
-      // For first load or forced refresh, always update the data
-      if (shouldRefreshData) {
-        console.log(`Refreshing GitHub data for user ${user.id} with username ${githubUsername}`);
-        
-        // Set initial progress state
-        updateProgress(user.id, 'initializing', 0, 100);
-        
-        // Call updateGitHubUserData with progress callback
-        const githubData = await updateGitHubUserData(
-          user.id,
-          timeRange,
-          // Progress callback function with enhanced details
-          (stage: string, completed: number, total: number, details?: string, orgName?: string) => {
-            if (user && user.id) {
-              updateProgress(user.id, stage, completed, total, details, orgName);
-            }
-          }
-        );
-        
-        // Get the updated user with fresh data
-        const updatedUser = await prisma.user.findUnique({
-          where: { id: user.id },
-          include: { 
-            stats: true,
-            achievements: true
-          },
-        });
-        
-        if (!updatedUser) {
-          throw new Error("Failed to get updated user data");
-        }
-        
-        const response: any = {
-          stats: {
-            ...(updatedUser.stats || {}),
-            points: updatedUser.points,
-            level: Math.floor(updatedUser.points / 100) + 1,
-            totalLinesChanged: githubData.totalLinesChanged,
-            stars: githubData.stars,
-            repos: githubData.repos,
-            currentStreak: githubData.currentStreak,
-            longestStreak: githubData.longestStreak,
-            activeDays: githubData.activeDays,
-            totalRepositoriesImpacted: githubData.totalRepositoriesImpacted
-          },
-          achievements: updatedUser.achievements || [],
-          timeRange,
-          connected: true,
-          refreshed: true,
-        };
-
-        if (debug) {
-          response.debug = {
-            userId: user.id,
-            githubUsername,
-            timeRange,
-            refreshReason: isFirstLoad ? "firstLoad" : forceRefresh ? "forceRefresh" : isDataStale ? "staleData" : "timeRangeChange",
-          };
-        }
-
-        return NextResponse.json(response);
-      } 
+    // Only refresh data from GitHub if explicitly requested or if it's the first load
+    if (forceRefresh || isFirstLoad) {
+      console.log(`Refreshing GitHub data for user ${user.id} with username ${githubUsername}`);
       
-      // Return cached data if available and not stale
-      const response: any = {
-        stats: {
-          ...(userData.stats || {}),
-          points: userData.points,
-          level: Math.floor(userData.points / 100) + 1,
+      // Set initial progress state
+      updateProgress(user.id, 'initializing', 0, 100);
+      
+      // Call updateGitHubUserData with progress callback
+      const githubData = await updateGitHubUserData(
+        user.id,
+        timeRange,
+        // Progress callback function with enhanced details
+        (stage: string, completed: number, total: number, details?: string, orgName?: string) => {
+          if (user && user.id) {
+            updateProgress(user.id, stage, completed, total, details, orgName);
+          }
+        }
+      );
+      
+      // Get the updated user with fresh data
+      const updatedUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        include: { 
+          stats: true,
+          achievements: true
         },
-        achievements: userData.achievements || [],
+      });
+      
+      if (!updatedUser) {
+        throw new Error("Failed to get updated user data");
+      }
+      
+      const response: any = {
+        stats: updatedUser.stats || {},
+        achievements: updatedUser.achievements || [],
         timeRange,
         connected: true,
-        cached: true,
+        refreshed: true,
       };
 
       if (debug) {
@@ -136,22 +94,34 @@ export async function GET(req: Request) {
           userId: user.id,
           githubUsername,
           timeRange,
-          fromCache: true,
+          refreshReason: isFirstLoad ? "firstLoad" : "forceRefresh",
+          lastRefreshed: updatedUser.stats?.lastRefreshed
         };
       }
 
       return NextResponse.json(response);
-    } catch (error: any) {
-      console.error("Error fetching GitHub user stats:", error);
-      return NextResponse.json({
-        error: "Failed to fetch GitHub user stats",
-        message: error.message || "Unknown error",
-        stats: null,
-        achievements: [],
+    } 
+    
+    // Return data from database
+    const response: any = {
+      stats: userData.stats || {},
+      achievements: userData.achievements || [],
+      timeRange,
+      connected: true,
+      cached: true,
+    };
+
+    if (debug) {
+      response.debug = {
+        userId: user.id,
+        githubUsername,
         timeRange,
-        connected: true,
-      }, { status: 500 });
+        fromCache: true,
+        lastRefreshed: userData.stats?.lastRefreshed
+      };
     }
+
+    return NextResponse.json(response);
   } catch (error: any) {
     console.error("Error in GitHub stats API:", error);
     return NextResponse.json(

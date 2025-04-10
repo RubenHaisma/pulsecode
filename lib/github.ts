@@ -2174,7 +2174,8 @@ export async function updateGitHubUserData(
       select: {
         id: true,
         githubUsername: true,
-        githubId: true
+        githubId: true,
+        points: true
       }
     });
     
@@ -2197,49 +2198,74 @@ export async function updateGitHubUserData(
       enhancedProgressCallback
     );
     
-    // Only update the database for all-time stats
-    if (timeRange === 'all') {
-      if (enhancedProgressCallback) {
-        enhancedProgressCallback('saving', 0, 100, 'Saving data to database');
-      }
+    // Always update the database, regardless of timeRange
+    if (enhancedProgressCallback) {
+      enhancedProgressCallback('saving', 0, 100, 'Saving data to database');
+    }
 
-      // Update user stats in the database
-      await prisma.stats.upsert({
-        where: { userId },
-        update: {
-          commits: githubData.commits,
-          pullRequests: githubData.pullRequests,
-          streak: githubData.streak,
-          lastActivity: githubData.lastActivity,
-          contributions: githubData.contributions || 0,
-          reviews: githubData.reviews,
-          privateRepos: githubData.privateRepos,
-          publicRepos: githubData.publicRepos,
-        },
-        create: {
-          userId,
-          commits: githubData.commits,
-          pullRequests: githubData.pullRequests,
-          streak: githubData.streak,
-          lastActivity: githubData.lastActivity,
-          contributions: githubData.contributions || 0,
-          reviews: githubData.reviews,
-          privateRepos: githubData.privateRepos,
-          publicRepos: githubData.publicRepos,
-        },
-      });
-      
-      if (enhancedProgressCallback) {
-        enhancedProgressCallback('saving', 50, 100, 'Checking for achievements');
-      }
-      
-      // Check for achievements
-      const { checkAndAwardAchievements } = await import('./achievements');
-      await checkAndAwardAchievements(userId);
-      
-      if (enhancedProgressCallback) {
-        enhancedProgressCallback('complete', 100, 100, 'GitHub data updated successfully');
-      }
+    // Calculate level from points
+    const level = Math.floor((user.points || 0) / 100) + 1;
+
+    // Update user stats in the database
+    await prisma.stats.upsert({
+      where: { userId },
+      update: {
+        commits: githubData.commits,
+        pullRequests: githubData.pullRequests,
+        streak: githubData.streak,
+        lastActivity: githubData.lastActivity,
+        contributions: githubData.contributions || 0,
+        reviews: githubData.reviews || 0,
+        privateRepos: githubData.privateRepos || 0,
+        publicRepos: githubData.publicRepos || 0,
+        totalLinesChanged: githubData.totalLinesChanged || 0,
+        stars: githubData.stars || 0,
+        repos: githubData.repos || 0,
+        currentStreak: githubData.currentStreak || 0,
+        longestStreak: githubData.longestStreak || 0,
+        activeDays: githubData.activeDays || 0,
+        totalRepositoriesImpacted: githubData.totalRepositoriesImpacted || 0,
+        mergedPullRequests: githubData.mergedPullRequests || 0,
+        openPullRequests: githubData.openPullRequests || 0,
+        lastRefreshed: new Date(),
+        level: level,
+        points: user.points || 0,
+      },
+      create: {
+        userId,
+        commits: githubData.commits,
+        pullRequests: githubData.pullRequests,
+        streak: githubData.streak,
+        lastActivity: githubData.lastActivity,
+        contributions: githubData.contributions || 0,
+        reviews: githubData.reviews || 0,
+        privateRepos: githubData.privateRepos || 0,
+        publicRepos: githubData.publicRepos || 0,
+        totalLinesChanged: githubData.totalLinesChanged || 0,
+        stars: githubData.stars || 0,
+        repos: githubData.repos || 0,
+        currentStreak: githubData.currentStreak || 0,
+        longestStreak: githubData.longestStreak || 0,
+        activeDays: githubData.activeDays || 0,
+        totalRepositoriesImpacted: githubData.totalRepositoriesImpacted || 0,
+        mergedPullRequests: githubData.mergedPullRequests || 0,
+        openPullRequests: githubData.openPullRequests || 0,
+        lastRefreshed: new Date(),
+        level: level,
+        points: user.points || 0,
+      },
+    });
+    
+    if (enhancedProgressCallback) {
+      enhancedProgressCallback('saving', 50, 100, 'Checking for achievements');
+    }
+    
+    // Check for achievements
+    const { checkAndAwardAchievements } = await import('./achievements');
+    await checkAndAwardAchievements(userId);
+    
+    if (enhancedProgressCallback) {
+      enhancedProgressCallback('complete', 100, 100, 'GitHub data updated successfully');
     }
     
     return githubData;
