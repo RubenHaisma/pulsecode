@@ -96,10 +96,10 @@ export default function AchievementsPage() {
   const achievementCount = achievements?.length || 0;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 lg:pl-0">
-      <h1 className="text-2xl sm:text-3xl font-bold tracking-tight pixel-font neon-glow mb-6">Your Achievements</h1>
+    <div className="container py-8 max-w-6xl">
+      <h1 className="text-3xl font-bold tracking-tight mb-8">Your Achievements</h1>
 
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-3 mb-6 sm:mb-8">
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-3 mb-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>Total Achievement Points</CardTitle>

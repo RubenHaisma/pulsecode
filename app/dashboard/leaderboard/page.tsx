@@ -153,13 +153,13 @@ export default function LeaderboardPage() {
   const hasNoUsers = users.length === 0;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 lg:pl-0">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight pixel-font neon-glow">Leaderboard</h1>
+    <div className="container py-8 max-w-6xl">
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">Leaderboard</h1>
         
-        <div className="flex gap-4 flex-wrap sm:flex-nowrap">
+        <div className="flex gap-4">
           <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-full sm:w-[150px] bg-black/60">
+            <SelectTrigger className="w-[150px] bg-black/60">
               <SelectValue placeholder="Time range" />
             </SelectTrigger>
             <SelectContent>
@@ -172,7 +172,7 @@ export default function LeaderboardPage() {
           </Select>
           
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-full sm:w-[150px] bg-black/60">
+            <SelectTrigger className="w-[150px] bg-black/60">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>

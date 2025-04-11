@@ -29,7 +29,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { motion } from "framer-motion"
 
 // Define types for activity data
 interface Activity {
@@ -295,41 +294,75 @@ export default function TimelinePage() {
   const renderTimelineVisualization = () => {
     if (loading) {
       return (
-        <div className="flex justify-center items-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
-        </div>
+        <Card className="neon-border bg-black/60">
+          <CardContent className="flex justify-center items-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+          </CardContent>
+        </Card>
       )
     }
     
     if (!activities.length) {
       return (
-        <div className="text-center py-16">
-          <p className="text-muted-foreground">No activity data available for the selected time range</p>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="mt-4 bg-black/60 border-white/20 hover:bg-purple-900/30 transition-colors"
-            onClick={refreshData}
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            <span>Refresh Data</span>
-          </Button>
-        </div>
+        <Card className="neon-border bg-black/60">
+          <CardContent className="text-center py-16">
+            <p className="text-muted-foreground">No activity data available for the selected time range</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-4 bg-black/60 border-white/20 hover:bg-purple-900/30 transition-colors"
+              onClick={refreshData}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              <span>Refresh Data</span>
+            </Button>
+          </CardContent>
+        </Card>
       )
     }
     
     // Handle daily view
     if (viewMode === "day") {
-      return renderDailyView()
+      return (
+        <Card className="neon-border bg-black/60">
+          <CardHeader>
+            <CardTitle className="text-lg">Daily Coding Activity</CardTitle>
+            <CardDescription>Your day-by-day contribution history</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {renderDailyView()}
+          </CardContent>
+        </Card>
+      )
     }
     
     // Handle weekly view
     if (viewMode === "week") {
-      return renderWeeklyView()
+      return (
+        <Card className="neon-border bg-black/60">
+          <CardHeader>
+            <CardTitle className="text-lg">Weekly Coding Activity</CardTitle>
+            <CardDescription>Your coding activity aggregated by week</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {renderWeeklyView()}
+          </CardContent>
+        </Card>
+      )
     }
     
     // Handle monthly view (default)
-    return renderMonthlyView()
+    return (
+      <Card className="neon-border bg-black/60">
+        <CardHeader>
+          <CardTitle className="text-lg">Monthly Coding Activity</CardTitle>
+          <CardDescription>Your coding patterns visualized by month</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {renderMonthlyView()}
+        </CardContent>
+      </Card>
+    )
   }
   
   // Render daily view
@@ -609,116 +642,68 @@ export default function TimelinePage() {
     )
   }
   
-  // Only render if on client
-  if (typeof window === "undefined") return null
-
+  // Main render
   return (
-    <div className="p-4 sm:p-6 lg:p-8 lg:pl-0">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-6"
-      >
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold pixel-font neon-glow">
-              Coding Timeline
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Visualize your coding activity over time
-            </p>
-          </div>
-          
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <Button
-              variant="ghost" 
-              size="icon"
-              className="mr-2"
-              onClick={() => router.push("/dashboard")}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="bg-black/60 border-white/20 hover:bg-purple-900/30 transition-colors"
-              onClick={refreshData}
-              disabled={isRefreshing}
-            >
-              {isRefreshing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  <span>Refreshing...</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  <span>Refresh</span>
-                </>
-              )}
-            </Button>
-          </div>
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Coding Timeline</h1>
+          <p className="text-sm text-muted-foreground">
+            Visualize your coding activity over time
+          </p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="flex items-center">
-            <div className="mr-4">
-              <p className="text-sm font-medium">Time Range</p>
-            </div>
-            <TimeRangeSelector 
-              value={timeRange} 
-              onChange={handleTimeRangeChange} 
-            />
-          </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="bg-black/60 border-white/20" 
+          onClick={() => router.push("/dashboard")}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          <span>Back to Dashboard</span>
+        </Button>
+      </div>
+      
+      {/* Rest of the content */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="sm:w-auto">
+          <TabsList className="bg-black/60">
+            <TabsTrigger value="day">Daily</TabsTrigger>
+            <TabsTrigger value="week">Weekly</TabsTrigger>
+            <TabsTrigger value="month">Monthly</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <TimeRangeSelector 
+            value={timeRange} 
+            onChange={handleTimeRangeChange}
+            className="w-full sm:w-auto"
+          />
           
-          <div className="flex items-center justify-end">
-            <div className="mr-4">
-              <p className="text-sm font-medium">View Mode</p>
-            </div>
-            <Tabs
-              value={viewMode} 
-              onValueChange={(value) => setViewMode(value as "day" | "week" | "month")}
-              className="w-auto"
-            >
-              <TabsList className="bg-black/60 border border-white/20">
-                <TabsTrigger value="day" className="data-[state=active]:bg-purple-900/50">
-                  Day
-                </TabsTrigger>
-                <TabsTrigger value="week" className="data-[state=active]:bg-purple-900/50">
-                  Week
-                </TabsTrigger>
-                <TabsTrigger value="month" className="data-[state=active]:bg-purple-900/50">
-                  Month
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="bg-black/60 border-white/20 w-full sm:w-auto" 
+            onClick={refreshData}
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <span>Refreshing...</span>
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                <span>Refresh Data</span>
+              </>
+            )}
+          </Button>
         </div>
-        
-        {/* Stats summary */}
-        {renderStatsCards()}
-        
-        <Separator className="my-6 bg-white/10" />
-        
-        {/* Timeline visualization */}
-        <Card className="neon-border bg-black/60">
-          <CardHeader>
-            <CardTitle className="text-lg">
-              {viewMode === "day" ? "Daily Coding Activity" : 
-               viewMode === "week" ? "Weekly Coding Activity" : 
-               "Monthly Coding Activity"}
-            </CardTitle>
-            <CardDescription>
-              {viewMode === "day" ? "Your day-by-day contribution history" : 
-               viewMode === "week" ? "Your coding activity aggregated by week" : 
-               "Your coding patterns visualized by month"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {renderTimelineVisualization()}
-          </CardContent>
-        </Card>
-      </motion.div>
+      </div>
+    
+      {renderTimelineVisualization()}
     </div>
   )
 } 
