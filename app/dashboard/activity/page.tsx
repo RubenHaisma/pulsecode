@@ -139,9 +139,9 @@ export default function ActivityPage() {
   }
 
   return (
-    <div className="container py-8 max-w-6xl">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">GitHub Activity</h1>
+    <div className="p-4 sm:p-6 lg:p-8 lg:pl-0">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight pixel-font neon-glow">GitHub Activity</h1>
         
         <div>
           <TimeRangeSelector

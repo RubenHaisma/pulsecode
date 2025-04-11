@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { motion } from "framer-motion"
 
 // Define types for activity data
 interface Activity {
@@ -608,12 +609,27 @@ export default function TimelinePage() {
     )
   }
   
-  // Main render
+  // Only render if on client
+  if (typeof window === "undefined") return null
+
   return (
-    <div className="container p-4 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
+    <div className="p-4 sm:p-6 lg:p-8 lg:pl-0">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6"
+      >
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold pixel-font neon-glow">
+              Coding Timeline
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Visualize your coding activity over time
+            </p>
+          </div>
+          
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <Button
               variant="ghost" 
               size="icon"
@@ -622,31 +638,26 @@ export default function TimelinePage() {
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Coding Timeline</h1>
-              <p className="text-muted-foreground">Detailed view of your coding activity over time</p>
-            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-black/60 border-white/20 hover:bg-purple-900/30 transition-colors"
+              onClick={refreshData}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <span>Refreshing...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  <span>Refresh</span>
+                </>
+              )}
+            </Button>
           </div>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="bg-black/60 border-white/20 hover:bg-purple-900/30 transition-colors"
-            onClick={refreshData}
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                <span>Refreshing...</span>
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                <span>Refresh</span>
-              </>
-            )}
-          </Button>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -707,7 +718,7 @@ export default function TimelinePage() {
             {renderTimelineVisualization()}
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
     </div>
   )
 } 
